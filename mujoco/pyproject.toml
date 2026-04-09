@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "humanoid-simulation"
+version = "0.1.0"
+description = "MuJoCo-based validation environment for humanoid policies trained in IsaacSim"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Oren Gershony", email = "ogershony@ucsd.edu"}  # Update with your information
+]
+
+dependencies = [
+    "mujoco>=3.4.0",
+    "numpy>=2.2.4",
+    "torch>=2.9.1",
+    "opencv-python>=4.12.0",
+    "imageio>=2.37.0",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

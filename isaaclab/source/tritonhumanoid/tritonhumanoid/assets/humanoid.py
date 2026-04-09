@@ -1,0 +1,226 @@
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""Configuration for my custom humanoid robot."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import isaaclab.sim as sim_utils
+from isaaclab.actuators import DelayedPDActuatorCfg, ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg
+
+import math
+
+qz_minus_90 = (
+    math.cos(math.pi / 4.0),  # ≈ 0.7071
+    0.0,
+    0.0,
+    -math.sin(math.pi / 4.0), # ≈ -0.7071
+)
+
+HUMANOID_CFG = ArticulationCfg(
+    prim_path="",  # you usually override this in the scene cfg
+    spawn=sim_utils.UsdFileCfg(
+        # usd_path=f"{Path(__file__).parent}/human/human.usd",
+        usd_path=f"{Path(__file__).parent}/human_offset_corrected/human_offset_corrected.usd",
+        activate_contact_sensors=True,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            disable_gravity=False,
+            retain_accelerations=False,
+            linear_damping=0.0,
+            angular_damping=0.0,
+            max_linear_velocity=1000.0,
+            max_angular_velocity=1000.0,
+            max_depenetration_velocity=5.0,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=True,
+            solver_position_iteration_count=12,
+            solver_velocity_iteration_count=2,
+        ),
+    ),
+
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(0.0, 0.0, 0.615),          # tweak height so feet just touch the ground
+        rot=qz_minus_90,
+        joint_pos={
+            "left_hip1_joint": 0.3,
+            "left_hip2_joint": 0.0,
+            "left_thigh_joint": 0.0,
+            "left_knee_joint": -0.8,
+            "left_ankle_joint": 0.5,
+            "right_hip1_joint": 0.3,
+            "right_hip2_joint": 0.0,
+            "right_thigh_joint": 0.0,
+            "right_knee_joint": -0.8,
+            "right_ankle_joint": 0.5,
+        },
+        joint_vel={".*": 0.0},
+    ),
+
+    soft_joint_pos_limit_factor=0.95,
+
+    actuators={
+        # Single group for all leg joints (velocity control)
+        "legs": ImplicitActuatorCfg(
+            joint_names_expr=[
+                "left_hip1_joint",
+                "left_hip2_joint",
+                "left_thigh_joint",
+                "left_knee_joint",
+                "left_ankle_joint",
+                "right_hip1_joint",
+                "right_hip2_joint",
+                "right_thigh_joint",
+                "right_knee_joint",
+                "right_ankle_joint",
+            ],
+            effort_limit_sim=120.0,
+            velocity_limit_sim=20.0,
+
+            # Velocity-control regime: P ≈ 0, D > 0
+            stiffness={
+                ".*hip.*":   300.0,
+                ".*thigh.*": 300.0,
+                ".*knee.*":  340.0,
+                ".*ankle.*": 160.0,
+            },
+            # divide all kp by 20 for kd
+            damping={
+                ".*hip.*": 15.0,
+                ".*thigh.*": 15.0,
+                ".*knee.*": 17.0,
+                ".*ankle.*": 8.0,
+            },
+
+            # Optional: very small joint friction/armature so it’s not totally ideal
+            friction=0.05,
+            armature=0.0,
+        ),
+    },
+)
+
+
+HUMANOID_LOCOMOTION_DELAYED_PD_CFG = HUMANOID_CFG.replace(
+    actuators={
+        # Dataset findings:
+        # - direct feedback-minus-command timestamp latency is ~1 ms overall
+        # - effective cmd-to-position response lag is reliably larger only for pairs 1/6 and 4/9
+        # Use small pair-specific delayed-PD buffering as a sim2real hedge without treating the
+        # full closed-loop response lag as pure transport delay.
+        "hip1_pair_1_6": DelayedPDActuatorCfg(
+            joint_names_expr=[
+                "left_hip1_joint",
+                "right_hip1_joint",
+            ],
+            effort_limit=120.0,
+            velocity_limit=20.0,
+            effort_limit_sim=120.0,
+            velocity_limit_sim=20.0,
+            stiffness={
+                "left_hip1_joint": 250.0,
+                "right_hip1_joint": 250.0,
+            },
+            damping={
+                "left_hip1_joint": 5.0,
+                "right_hip1_joint": 5.0,
+            },
+            min_delay=1,
+            max_delay=1,
+            friction=0.0,
+            armature=0.0,
+        ),
+        "hip2_pair_2_7": DelayedPDActuatorCfg(
+            joint_names_expr=[
+                "left_hip2_joint",
+                "right_hip2_joint",
+            ],
+            effort_limit=120.0,
+            velocity_limit=20.0,
+            effort_limit_sim=120.0,
+            velocity_limit_sim=20.0,
+            stiffness={
+                "left_hip2_joint": 250.0,
+                "right_hip2_joint": 250.0,
+            },
+            damping={
+                "left_hip2_joint": 5.0,
+                "right_hip2_joint": 5.0,
+            },
+            min_delay=0,
+            max_delay=1,
+            friction=0.0,
+            armature=0.0,
+        ),
+        "thigh_pair_3_8": DelayedPDActuatorCfg(
+            joint_names_expr=[
+                "left_thigh_joint",
+                "right_thigh_joint",
+            ],
+            effort_limit=120.0,
+            velocity_limit=20.0,
+            effort_limit_sim=120.0,
+            velocity_limit_sim=20.0,
+            stiffness={
+                "left_thigh_joint": 100.0,
+                "right_thigh_joint": 100.0,
+            },
+            damping={
+                "left_thigh_joint": 2.0,
+                "right_thigh_joint": 2.0,
+            },
+            min_delay=0,
+            max_delay=1,
+            friction=0.0,
+            armature=0.0,
+        ),
+        "knee_pair_4_9": DelayedPDActuatorCfg(
+            joint_names_expr=[
+                "left_knee_joint",
+                "right_knee_joint",
+            ],
+            effort_limit=120.0,
+            velocity_limit=20.0,
+            effort_limit_sim=120.0,
+            velocity_limit_sim=20.0,
+            stiffness={
+                "left_knee_joint": 150.0,
+                "right_knee_joint": 150.0,
+            },
+            damping={
+                "left_knee_joint": 5.0,
+                "right_knee_joint": 5.0,
+            },
+            min_delay=1,
+            max_delay=2,
+            friction=0.0,
+            armature=0.0,
+        ),
+        "ankle_pair_5_10": DelayedPDActuatorCfg(
+            joint_names_expr=[
+                "left_ankle_joint",
+                "right_ankle_joint",
+            ],
+            effort_limit=120.0,
+            velocity_limit=20.0,
+            effort_limit_sim=120.0,
+            velocity_limit_sim=20.0,
+            stiffness={
+                "left_ankle_joint": 120.0,
+                "right_ankle_joint": 120.0,
+            },
+            damping={
+                "left_ankle_joint": 0.8,
+                "right_ankle_joint": 1.0,
+            },
+            min_delay=0,
+            max_delay=1,
+            friction=0.0,
+            armature=0.0,
+        ),
+    },
+)
