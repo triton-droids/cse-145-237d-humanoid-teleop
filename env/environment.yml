@@ -1,0 +1,18 @@
+name: pose-estimation
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pinocchio=4.0
+  - pip
+  - pip:
+      - numpy
+      - scipy
+      - pandas
+      - matplotlib
+      - pydantic
+      - tqdm
+      - pytest
+      - mujoco
+      - ahrs
+      - transforms3d
