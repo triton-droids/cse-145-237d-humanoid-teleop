@@ -1,0 +1,39 @@
+# Local environments and package caches
+.conda/
+.venv/
+venv/
+.pip-cache/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
+
+# Generated demo outputs and captures
+data/ik_demo/
+data/visualizations/
+data/synthetic_runs/
+data/logs/
+data/calibration_captures/
+data/evaluation_reports/
+
+# Large or local sensor recordings
+*.bag
+*.mcap
+*.npz
+*.npy
+*.h5
+*.hdf5
+
+# Local editor and OS noise
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# Runtime logs
+*.log
