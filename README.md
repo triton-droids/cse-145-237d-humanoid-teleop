@@ -6,7 +6,8 @@ Build a real-time lower-body pose estimator for wearable IMUs.
 The target hardware path is:
 
 ```text
-BNO085 quaternion streams
+BNO085 quaternion streams on 7 ESP32-S3 nodes
+    -> direct Wi-Fi UDP to Jetson Nano
     -> sensor packet normalization
     -> neutral-pose and functional calibration
     -> sensor-to-segment alignment
@@ -20,22 +21,49 @@ as a synthetic test harness for fake IMU data, but the main workflow is the
 real-world wearable pipeline.
 
 ## Current Sensor Assumption
-The BNO085 can provide fused orientation quaternions directly. Our near-term
-input should therefore be quaternion packets, not raw accel/gyro fusion.
+The BNO085 provides fused orientation quaternions directly. Our current input
+contract is therefore quaternion packets, not raw accel/gyro fusion.
+
+Each ESP32-S3 streams directly to the Jetson over UDP. The pelvis ESP32 is not
+the hub in the first architecture; it is just another sensor node.
 
 Expected packet shape:
 
 ```text
 QuaternionPacket:
-    t
+    magic/version
     sensor_id
-    segment_hint
-    quat_wxyz or quat_xyzw
-    status_optional
+    segment_id
+    sequence
+    sensor_time_us
+    quat_wxyz
+    accuracy
+    status
+    report_type
 ```
 
-The exact quaternion convention must be normalized at the sensor boundary before
-the estimator sees it.
+Current packet format is a 40-byte little-endian binary UDP payload with `IMUQ`
+magic and `wxyz` quaternion order.
+
+Identity rules:
+
+- `sensor_id` means which physical ESP32-S3 board sent the packet.
+- `segment_id` means where that board is mounted for this session.
+- calibration should bind primarily to `segment_id`.
+- diagnostics should also track `sensor_id` so a bad physical board can be found.
+
+Segment IDs:
+
+```text
+0 pelvis
+1 left_thigh
+2 left_shank
+3 left_foot
+4 right_thigh
+5 right_shank
+6 right_foot
+255 unknown
+```
 
 ## Wearable Placement
 Default placement for the lower-body setup:
@@ -64,7 +92,7 @@ Recommended first calibration sequence:
 6. save a calibration profile
 ```
 
-The calibration profile should eventually contain:
+The calibration profile should contain:
 
 ```text
 CalibrationProfile:
@@ -115,13 +143,33 @@ conda run -p .\.conda python demos\demo_imu_orientation_ik.py
 The next real work should happen in this order:
 
 ```text
-1. define BNO085-like quaternion packet objects
-2. add neutral standing calibration
-3. add thigh/shank heading alignment
-4. add functional knee-hinge calibration
-5. route calibrated quaternions into IK
-6. keep MuJoCo only as a fake-data generator and regression harness
+1. flash one ESP32-S3/BNO085 node and receive UDP packets on the Jetson
+2. flash all 7 nodes with unique sensor_id and segment_id settings
+3. tune quaternion spike filtering with real packet traces
+4. validate neutral standing calibration
+5. add thigh/shank heading alignment
+6. add functional knee-hinge calibration
+7. route calibrated quaternions into IK
+8. keep MuJoCo only as a fake-data generator and regression harness
 ```
 
 The guiding rule: the estimator should be designed for messy straps and real
 people first, then tested with simulation as a convenience.
+
+## Current Real-World Pipeline Code
+
+Implemented so far:
+
+- ESP32-S3/BNO085 UDP packet firmware scaffold
+- Jetson-side binary quaternion packet parser
+- latest-packet UDP receiver buffer
+- quaternion norm/stale/spike filtering
+- SLERP smoothing
+- neutral standing calibration profile from quaternion samples
+
+Not implemented yet:
+
+- thigh/shank heading alignment
+- functional knee-hinge calibration
+- magnetometer disturbance gating
+- live calibrated packet-to-IK integration

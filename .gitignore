@@ -37,3 +37,6 @@ Desktop.ini
 
 # Runtime logs
 *.log
+
+# Local firmware secrets
+hardware/**/secrets.h

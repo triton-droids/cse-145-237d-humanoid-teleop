@@ -1,6 +1,7 @@
 # IK Workflow
 
-This folder estimates lower-body joint pose from calibrated orientations.
+This folder estimates lower-body joint pose from calibrated segment
+orientations.
 
 Current prototype:
 
@@ -9,7 +10,7 @@ Current prototype:
 - `planar_leg.py` is a small toy planar IK solver and should stay separate from
   the real wearable path.
 
-The real-world input should eventually be:
+The real-world input should be built from seven calibrated quaternion streams:
 
 ```text
 calibrated segment orientations
@@ -25,3 +26,7 @@ calibrated segment orientations
 The output should be joint estimates plus confidence/residual information. The
 solver should respect anatomical constraints instead of trusting every raw
 quaternion equally.
+
+The IK layer should not parse UDP packets and should not know about ESP32 board
+IDs. It should consume calibrated segment orientations after `sensor/` and
+`calibration/` have already normalized the data.
