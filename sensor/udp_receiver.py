@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 import socket
 import time
+from typing import Callable
 
 from .packet import QuaternionPacket, SegmentId, parse_quaternion_packet
 
@@ -43,6 +44,7 @@ def receive_quaternion_packets(
     host: str = "0.0.0.0",
     port: int = 5005,
     timeout_s: float | None = None,
+    on_timeout: Callable[[], None] | None = None,
 ) -> Iterator[QuaternionPacket]:
     """Yield parsed quaternion packets from a UDP socket."""
 
@@ -50,7 +52,12 @@ def receive_quaternion_packets(
         sock.bind((host, port))
         sock.settimeout(timeout_s)
         while True:
-            payload, _addr = sock.recvfrom(256)
+            try:
+                payload, _addr = sock.recvfrom(256)
+            except socket.timeout:
+                if on_timeout is not None:
+                    on_timeout()
+                continue
             yield parse_quaternion_packet(payload, receive_time_s=time.monotonic())
 
 

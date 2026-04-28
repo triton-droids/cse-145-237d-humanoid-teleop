@@ -29,9 +29,18 @@ def main() -> None:
     buffer = LatestPacketBuffer()
     receive_history: dict[SegmentId, deque[float]] = defaultdict(lambda: deque(maxlen=120))
     last_print = 0.0
+    last_wait_print = 0.0
 
     print(f"Listening for IMU quaternion UDP packets on {args.host}:{args.port}")
-    for packet in receive_quaternion_packets(host=args.host, port=args.port):
+
+    def on_timeout() -> None:
+        nonlocal last_wait_print
+        now = time.monotonic()
+        if now - last_wait_print >= 1.0:
+            print(f"listening on {args.host}:{args.port}... no UDP packets yet")
+            last_wait_print = now
+
+    for packet in receive_quaternion_packets(host=args.host, port=args.port, timeout_s=0.25, on_timeout=on_timeout):
         buffer.update(packet)
         receive_history[packet.segment_id].append(packet.receive_time_s)
 

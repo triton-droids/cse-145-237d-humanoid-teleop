@@ -3,9 +3,9 @@
 
 #pragma once
 
-#define WIFI_SSID "your-network"
-#define WIFI_PASSWORD "your-password"
-#define JETSON_IP IPAddress(192, 168, 1, 50)
+#define WIFI_SSID "SSID"
+#define WIFI_PASSWORD "Password"
+#define JETSON_IP IPAddress(192, 168, 29, 156)
 #define JETSON_PORT 5005
 
 // Segment IDs:
@@ -30,3 +30,6 @@
 #define BNO08X_TX_PIN 17
 #define BNO08X_RX_PIN 18
 #define BNO08X_UART_BAUD 3000000
+
+// Wi-Fi diagnostics timeout before retrying.
+#define WIFI_CONNECT_TIMEOUT_MS 20000

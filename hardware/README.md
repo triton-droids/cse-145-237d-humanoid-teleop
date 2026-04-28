@@ -50,6 +50,8 @@ Board-only sanity check:
   GPIO 38.
 - `esp32s3_bno085_uart_sanity/` verifies the ESP32-S3 can read BNO085
   rotation-vector quaternions over full UART.
+- `esp32s3_bno085_ble_sanity/` is a no-Wi-Fi BLE test that advertises
+  quaternion text notifications.
 
 Initial firmware lives in `esp32_bno085_udp/`.
 
@@ -88,6 +90,37 @@ The firmware sends 40-byte little-endian UDP packets with `IMUQ` magic and
 
 Copy `esp32_bno085_udp/secrets.example.h` to `secrets.h` for local Wi-Fi and
 board-specific settings. `secrets.h` is ignored by Git.
+
+The UDP firmware prints Wi-Fi diagnostics over Serial Monitor at `115200`.
+During connection it will:
+
+- scan nearby networks
+- report whether `WIFI_SSID` was found
+- print Wi-Fi status changes such as `WL_NO_SSID_AVAIL` or `WL_CONNECT_FAILED`
+- time out after `WIFI_CONNECT_TIMEOUT_MS`
+- print the ESP32 IP, gateway, and RSSI after connecting
+
+Common readings:
+
+```text
+Target SSID was NOT found
+```
+
+The SSID is misspelled, the network is not nearby, or it is not available on
+2.4 GHz.
+
+```text
+WL_CONNECT_FAILED
+```
+
+The password/security settings are probably wrong.
+
+```text
+Wi-Fi connected, but receiver is silent
+```
+
+Check `JETSON_IP`, Windows Firewall, and that the laptop/Jetson receiver is
+listening on `0.0.0.0:5005`.
 
 ## BNO085 Transport
 
