@@ -9,6 +9,7 @@ Current tests cover:
 - neutral calibration profile creation
 - toy planar IK behavior
 - synthetic IMU orientation consistency
+- seven-point lower-body skeleton aggregation
 - lower-body geometry assumptions
 - MuJoCo model loading and viewer helper outputs
 
