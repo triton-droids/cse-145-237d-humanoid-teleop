@@ -122,6 +122,51 @@ Wi-Fi connected, but receiver is silent
 Check `JETSON_IP`, Windows Firewall, and that the laptop/Jetson receiver is
 listening on `0.0.0.0:5005`.
 
+## UDP Timing Checks
+
+The ESP32 streams quaternion packets to:
+
+```text
+JETSON_IP:JETSON_PORT
+```
+
+and also listens for latency pings on:
+
+```text
+ESP32_UDP_LOCAL_PORT
+```
+
+Default ports:
+
+```text
+JETSON_PORT = 5005
+ESP32_UDP_LOCAL_PORT = 5006
+```
+
+Run the quaternion receiver:
+
+```powershell
+conda run --no-capture-output -p .\.conda python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
+```
+
+The receiver reports:
+
+- `hz`: packet receive rate
+- `age_ms`: time since the latest packet was received
+- `rj_ms`: receive-side interval jitter
+- `sj_ms`: ESP32 sensor timestamp interval jitter
+- `drops`: inferred sequence-number drops
+
+True one-way latency cannot be measured from `ESP32 micros()` alone because the
+ESP32 clock and laptop/Jetson clock are not synchronized. For a practical latency
+number, measure round-trip time:
+
+```powershell
+conda run --no-capture-output -p .\.conda python demos\demo_udp_latency_ping.py 192.168.1.164 --port 5006
+```
+
+Use the ESP32 IP printed by Serial Monitor.
+
 ## BNO085 Transport
 
 Use **full UART** for the BNO085 on ESP32-S3. This is the transport mode for

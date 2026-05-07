@@ -40,6 +40,10 @@
 #define JETSON_PORT 5005
 #endif
 
+#ifndef ESP32_UDP_LOCAL_PORT
+#define ESP32_UDP_LOCAL_PORT 5006
+#endif
+
 // Give each ESP32 a unique sensor id and segment id before flashing.
 // Segment ids match sensor/packet.py:
 // 0 pelvis, 1 left_thigh, 2 left_shank, 3 left_foot,
@@ -103,6 +107,7 @@ WiFiUDP udp;
 uint32_t sequence_number = 0;
 uint32_t sent_packets = 0;
 uint32_t failed_udp_packets = 0;
+uint32_t ping_replies = 0;
 uint32_t last_heartbeat_ms = 0;
 float last_qw = 0.0f;
 float last_qx = 0.0f;
@@ -174,6 +179,8 @@ bool connectWiFi() {
   Serial.print(JETSON_IP);
   Serial.print(":");
   Serial.println(JETSON_PORT);
+  Serial.print("ESP32 UDP local port: ");
+  Serial.println(ESP32_UDP_LOCAL_PORT);
 
   printWifiScan();
 
@@ -284,6 +291,8 @@ void printStreamingHeartbeat() {
   Serial.print(sent_packets);
   Serial.print(" failed=");
   Serial.print(failed_udp_packets);
+  Serial.print(" ping_replies=");
+  Serial.print(ping_replies);
   Serial.print(" target=");
   Serial.print(JETSON_IP);
   Serial.print(":");
@@ -302,6 +311,30 @@ void printStreamingHeartbeat() {
   Serial.println(last_qz, 4);
 }
 
+void handleUdpPing() {
+  const int packet_size = udp.parsePacket();
+  if (packet_size <= 0) {
+    return;
+  }
+
+  char buffer[96];
+  const int read_size = udp.read(buffer, min(packet_size, static_cast<int>(sizeof(buffer) - 1)));
+  if (read_size <= 0) {
+    return;
+  }
+  buffer[read_size] = '\0';
+
+  if (strncmp(buffer, "PING,", 5) != 0) {
+    return;
+  }
+
+  udp.beginPacket(udp.remoteIP(), udp.remotePort());
+  udp.write(reinterpret_cast<const uint8_t *>(buffer), read_size);
+  if (udp.endPacket()) {
+    ping_replies++;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -316,13 +349,15 @@ void setup() {
     Serial.println("Retrying Wi-Fi in 5 seconds...");
     delay(5000);
   }
-  udp.begin(0);
+  udp.begin(ESP32_UDP_LOCAL_PORT);
   setupBNO085();
 
   Serial.println("Streaming BNO085 rotation-vector quaternions over UDP");
 }
 
 void loop() {
+  handleUdpPing();
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Wi-Fi disconnected.");
     while (!connectWiFi()) {

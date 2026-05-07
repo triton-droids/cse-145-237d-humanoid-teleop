@@ -7,6 +7,7 @@
 #define WIFI_PASSWORD "Password"
 #define JETSON_IP IPAddress(192, 168, 29, 156)
 #define JETSON_PORT 5005
+#define ESP32_UDP_LOCAL_PORT 5006
 
 // Segment IDs:
 // 0 pelvis

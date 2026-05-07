@@ -23,11 +23,12 @@ if str(PROJECT_ROOT) not in sys.path:
 from simulator.mujoco_lower_body import (  # noqa: E402
     build_lower_body_mjcf,
     clamp_ctrl_to_actuator_ranges,
-    format_pose_readout,
+    format_pose_readout_from_imus,
     lower_body_points_from_qpos,
-    pose_overlay_columns,
+    pose_overlay_columns_from_imus,
     pose_presets,
     preset_qpos,
+    virtual_imu_orientations_from_mujoco,
 )
 
 
@@ -397,7 +398,13 @@ def main() -> None:
 
         estimator_canvas.draw_idle()
 
-    def refresh_estimator_ui(qpos: np.ndarray, *, preset_name: str, animate: bool) -> None:
+    def refresh_estimator_ui(
+        imu,
+        qpos: np.ndarray,
+        *,
+        preset_name: str,
+        animate: bool,
+    ) -> None:
         if estimator_root is None or not estimator_root.winfo_exists():
             return
         if estimator_text is None:
@@ -409,8 +416,8 @@ def main() -> None:
         if now - last_estimator_refresh["time"] < estimator_refresh_interval:
             return
 
-        readout = format_pose_readout(
-            qpos,
+        readout = format_pose_readout_from_imus(
+            imu,
             preset_name=preset_name,
             animate=animate,
         )
@@ -480,13 +487,14 @@ def main() -> None:
             data.qpos[:] = data.qpos + 0.16 * (target_qpos - data.qpos)
             data.qvel[:] = 0.0
             mujoco.mj_forward(model, data)
+            imu = virtual_imu_orientations_from_mujoco(model, data)
 
             with viewer.lock():
                 viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE
                 now = time.time()
                 if now - last_overlay > 0.1:
-                    left_text, right_text = pose_overlay_columns(
-                        data.qpos,
+                    left_text, right_text = pose_overlay_columns_from_imus(
+                        imu,
                         preset_name=preset_name,
                         animate=animate,
                     )
@@ -513,6 +521,7 @@ def main() -> None:
                 if not ui_redraw_paused():
                     sync_slider_vars()
                 refresh_estimator_ui(
+                    imu,
                     data.qpos,
                     preset_name=preset_name,
                     animate=animate,

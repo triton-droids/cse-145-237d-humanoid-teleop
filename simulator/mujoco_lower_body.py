@@ -5,10 +5,12 @@ from __future__ import annotations
 from math import radians
 from typing import Iterable
 
+import mujoco
 import numpy as np
 from scipy.spatial.transform import Rotation
 
 from ik.imu_orientation import (
+    LowerLimbOrientationSolution,
     default_lower_limb_mounts,
     front_pelvis_mount,
     imu_orientation_from_segment,
@@ -35,6 +37,16 @@ JOINT_NAMES = (
 )
 
 ACTUATOR_NAMES = tuple(f"{joint}_ctrl" for joint in JOINT_NAMES)
+
+VIRTUAL_IMU_SITE_NAMES = {
+    "pelvis": "pelvis_imu",
+    "left_thigh": "left_thigh_imu",
+    "left_shank": "left_shank_imu",
+    "left_foot": "left_foot_imu",
+    "right_thigh": "right_thigh_imu",
+    "right_shank": "right_shank_imu",
+    "right_foot": "right_foot_imu",
+}
 
 
 def build_lower_body_mjcf(
@@ -254,15 +266,7 @@ def clamp_ctrl_to_actuator_ranges(model, ctrl: np.ndarray) -> np.ndarray:
 
 
 def site_names() -> tuple[str, ...]:
-    return (
-        "pelvis_imu",
-        "left_thigh_imu",
-        "left_shank_imu",
-        "left_foot_imu",
-        "right_thigh_imu",
-        "right_shank_imu",
-        "right_foot_imu",
-    )
+    return tuple(VIRTUAL_IMU_SITE_NAMES.values())
 
 
 def segment_rotations_from_qpos(qpos: np.ndarray) -> dict[str, Rotation]:
@@ -316,6 +320,23 @@ def imu_orientations_from_qpos(qpos: np.ndarray) -> dict[str, Rotation]:
     }
 
 
+def virtual_imu_orientations_from_mujoco(
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+) -> dict[str, Rotation]:
+    """Return world-from-sensor rotations from the MuJoCo virtual IMU sites."""
+
+    imu_orientations: dict[str, Rotation] = {}
+    for segment_name, site_name in VIRTUAL_IMU_SITE_NAMES.items():
+        site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+        if site_id < 0:
+            raise ValueError(f"missing MuJoCo IMU site: {site_name}")
+        imu_orientations[segment_name] = Rotation.from_matrix(
+            np.asarray(data.site_xmat[site_id]).reshape(3, 3)
+        )
+    return imu_orientations
+
+
 def lower_body_points_from_qpos(
     qpos: np.ndarray,
     dimensions: LowerBodyDimensions = LowerBodyDimensions(),
@@ -347,10 +368,11 @@ def lower_body_points_from_qpos(
     }
 
 
-def format_pose_readout(qpos: np.ndarray, *, preset_name: str, animate: bool) -> str:
-    """Return a compact live readout for the current viewer pose."""
+def lower_limb_solutions_from_imus(
+    imu: dict[str, Rotation],
+) -> tuple[LowerLimbOrientationSolution, LowerLimbOrientationSolution]:
+    """Solve left and right lower-limb joints from virtual or real IMU rotations."""
 
-    imu = imu_orientations_from_qpos(qpos)
     left_solution = solve_lower_limb_joints_from_imus(
         {
             "pelvis": imu["pelvis"],
@@ -371,6 +393,18 @@ def format_pose_readout(qpos: np.ndarray, *, preset_name: str, animate: bool) ->
         side="right",
         mounts={"pelvis": front_pelvis_mount()},
     )
+    return left_solution, right_solution
+
+
+def format_pose_readout_from_imus(
+    imu: dict[str, Rotation],
+    *,
+    preset_name: str,
+    animate: bool,
+) -> str:
+    """Return a compact live readout from virtual or real IMU orientations."""
+
+    left_solution, right_solution = lower_limb_solutions_from_imus(imu)
 
     pelvis_xyzw = imu["pelvis"].as_quat()
     pelvis_wxyz = (pelvis_xyzw[3], pelvis_xyzw[0], pelvis_xyzw[1], pelvis_xyzw[2])
@@ -399,35 +433,25 @@ def format_pose_readout(qpos: np.ndarray, *, preset_name: str, animate: bool) ->
     )
 
 
-def pose_overlay_columns(
-    qpos: np.ndarray,
+def format_pose_readout(qpos: np.ndarray, *, preset_name: str, animate: bool) -> str:
+    """Return a compact live readout for the current viewer pose."""
+
+    return format_pose_readout_from_imus(
+        imu_orientations_from_qpos(qpos),
+        preset_name=preset_name,
+        animate=animate,
+    )
+
+
+def pose_overlay_columns_from_imus(
+    imu: dict[str, Rotation],
     *,
     preset_name: str,
     animate: bool,
 ) -> tuple[str, str]:
-    """Return left/right overlay text columns for the MuJoCo viewer."""
+    """Return left/right overlay text from virtual or real IMU orientations."""
 
-    imu = imu_orientations_from_qpos(qpos)
-    left_solution = solve_lower_limb_joints_from_imus(
-        {
-            "pelvis": imu["pelvis"],
-            "thigh": imu["left_thigh"],
-            "shank": imu["left_shank"],
-            "foot": imu["left_foot"],
-        },
-        side="left",
-        mounts={"pelvis": front_pelvis_mount()},
-    )
-    right_solution = solve_lower_limb_joints_from_imus(
-        {
-            "pelvis": imu["pelvis"],
-            "thigh": imu["right_thigh"],
-            "shank": imu["right_shank"],
-            "foot": imu["right_foot"],
-        },
-        side="right",
-        mounts={"pelvis": front_pelvis_mount()},
-    )
+    left_solution, right_solution = lower_limb_solutions_from_imus(imu)
 
     pelvis_xyzw = imu["pelvis"].as_quat()
     pelvis_wxyz = (pelvis_xyzw[3], pelvis_xyzw[0], pelvis_xyzw[1], pelvis_xyzw[2])
@@ -473,6 +497,21 @@ def pose_overlay_columns(
         ]
     )
     return left_column, right_column
+
+
+def pose_overlay_columns(
+    qpos: np.ndarray,
+    *,
+    preset_name: str,
+    animate: bool,
+) -> tuple[str, str]:
+    """Return left/right overlay text columns for the MuJoCo viewer."""
+
+    return pose_overlay_columns_from_imus(
+        imu_orientations_from_qpos(qpos),
+        preset_name=preset_name,
+        animate=animate,
+    )
 
 
 def _quat_wxyz(xyzw: Iterable[float]) -> str:
