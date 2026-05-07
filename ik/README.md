@@ -9,6 +9,9 @@ Current prototype:
   IMU quaternions.
 - `planar_leg.py` is a small toy planar IK solver and should stay separate from
   the real wearable path.
+- `lower_body_aggregation.py` combines seven calibrated segment orientations
+  into one pelvis/legs/feet skeleton with joint positions and relative joint
+  rotations.
 
 The real-world input should be built from seven calibrated quaternion streams:
 
@@ -30,3 +33,9 @@ quaternion equally.
 The IK layer should not parse UDP packets and should not know about ESP32 board
 IDs. It should consume calibrated segment orientations after `sensor/` and
 `calibration/` have already normalized the data.
+
+Aggregation demo:
+
+```powershell
+conda run -p .\.conda python demos\demo_lower_body_aggregation.py
+```
