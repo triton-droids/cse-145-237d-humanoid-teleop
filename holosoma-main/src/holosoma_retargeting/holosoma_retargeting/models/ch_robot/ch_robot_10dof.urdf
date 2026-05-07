@@ -1,0 +1,358 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="ch_robot">
+
+  <link name="torso">
+    <inertial>
+      <origin xyz="-0.15417 -0.030012 0.697219" rpy="0 0 0"/>
+      <mass value="3.175"/>
+      <inertia ixx="5.173e-3" ixy="3.126e-17" ixz="1.463904e-6"
+               iyy="1.947e-2" iyz="-1.478e-16" izz="2.099e-2"/>
+    </inertial>
+    <collision>
+      <origin xyz="-0.154672 -0.03 0.6962" rpy="0 0 0"/>
+      <geometry><box size="0.28 0.12 0.096"/></geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/battery_box.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="hip">
+    <inertial>
+      <origin xyz="-0.155587 -0.02906 0.584318" rpy="0 0 0"/>
+      <mass value="5.159055"/>
+      <inertia ixx="0.0156" ixy="0.000178966" ixz="0.000001857794"
+               iyy="0.02377" iyz="-0.000043706028" izz="0.02517"/>
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/hip_ch.stl" scale="0.001 0.001 0.001"/></geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/hip_dumb2.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <!-- ==================== LEFT LEG ==================== -->
+  <link name="left_leg1">
+    <inertial>
+      <origin xyz="-0.005945 -0.035287 0.577433" rpy="0 0 0"/>
+      <mass value="2.189611"/>
+      <inertia ixx="0.002609" ixy="0.000081259088" ixz="0.000001365266"
+               iyy="0.003137" iyz="0.000000223227" izz="0.003391"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.068372 0.029495 -0.577401" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/left_leg1_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="left_leg2">
+    <inertial>
+      <origin xyz="-0.000018 -0.025475 0.486173" rpy="0 0 0"/>
+      <mass value="1.709674"/>
+      <inertia ixx="0.006082" ixy="0.000025844041" ixz="0.000000765045"
+               iyy="0.005232" iyz="-0.0005798" izz="0.002818"/>
+    </inertial>
+    <visual>
+      <origin xyz="4.8e-05 0.029495 -0.577401" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/left_leg2_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="left_leg3">
+    <inertial>
+      <origin xyz="0.005174 -0.030248 0.318931" rpy="0 0 0"/>
+      <mass value="3.156742"/>
+      <inertia ixx="0.009368" ixy="0.000046968418" ixz="0.0002014"
+               iyy="0.0081" iyz="-0.000049473856" izz="0.004377"/>
+    </inertial>
+    <visual>
+      <origin xyz="4.8e-05 0.029495 -0.463816" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/left_leg3_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="left_leg4">
+    <inertial>
+      <origin xyz="0.001337 -0.031134 0.183938" rpy="0 0 0"/>
+      <mass value="1.980828"/>
+      <inertia ixx="0.01171" ixy="-0.000022781438" ixz="0.0002839"
+               iyy="0.01193" iyz="-0.0002341" izz="0.002972"/>
+    </inertial>
+    <visual>
+      <origin xyz="4.8e-05 0.029495 -0.306338" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/left_leg4_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="left_foot">
+    <inertial>
+      <origin xyz="-0.00053 -0.020276 0.011109" rpy="0 0 0"/>
+      <mass value="0.765723"/>
+      <inertia ixx="0.002071" ixy="-0.000017795772" ixz="0.000002818065"
+               iyy="0.0004678" iyz="0.0001167" izz="0.002213"/>
+    </inertial>
+    <collision>
+      <origin xyz="-0.01 0.025 -0.035" rpy="0 0 0"/>
+      <geometry><box size="0.08 0.21 0.01526"/></geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.00958 0.03 -0.031528" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/left_foot.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <!-- Left foot contact spheres -->
+  <link name="left_foot_sphere_1_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+  <link name="left_foot_sphere_2_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+  <link name="left_foot_sphere_3_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+  <link name="left_foot_sphere_4_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+
+  <!-- ==================== RIGHT LEG ==================== -->
+  <link name="right_leg1">
+    <inertial>
+      <origin xyz="-0.305326 -0.035287 0.577434" rpy="0 0 0"/>
+      <mass value="2.189548"/>
+      <inertia ixx="0.002609" ixy="-0.000081252869" ixz="-0.00000135392"
+               iyy="0.003137" iyz="0.00000024481" izz="0.003391"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.2429 0.029495 -0.577401" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/right_leg1_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="right_leg2">
+    <inertial>
+      <origin xyz="-0.311252 -0.025506 0.485714" rpy="0 0 0"/>
+      <mass value="1.72284"/>
+      <inertia ixx="0.006132" ixy="-0.000025837194" ixz="-0.000000742612"
+               iyy="0.005281" iyz="-0.000583" izz="0.002822"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.311223 0.029495 -0.577401" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/right_leg2_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="right_leg3">
+    <inertial>
+      <origin xyz="-0.317293 -0.030266 0.31875" rpy="0 0 0"/>
+      <mass value="3.074969"/>
+      <inertia ixx="0.009174" ixy="-0.000045044639" ixz="-0.0002255"
+               iyy="0.007824" iyz="-0.000049133206" izz="0.004262"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.311223 0.029495 -0.463816" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/right_leg3_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="right_leg4">
+    <inertial>
+      <origin xyz="-0.312608 -0.031134 0.183938" rpy="0 0 0"/>
+      <mass value="1.980828"/>
+      <inertia ixx="0.01171" ixy="0.000022781459" ixz="-0.0002839"
+               iyy="0.01193" iyz="-0.0002341" izz="0.002972"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.311223 0.029495 -0.306338" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/right_leg4_dumb.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <link name="right_foot">
+    <inertial>
+      <origin xyz="-0.310741 -0.020276 0.011109" rpy="0 0 0"/>
+      <mass value="0.765723"/>
+      <inertia ixx="0.002071" ixy="0.000017795772" ixz="-0.000002818065"
+               iyy="0.0004678" iyz="0.0001167" izz="0.002213"/>
+    </inertial>
+    <collision>
+      <origin xyz="0.01 0.025 -0.035" rpy="0 0 0"/>
+      <geometry><box size="0.08 0.21 0.01526"/></geometry>
+    </collision>
+    <visual>
+      <origin xyz="0.320851 0.03 -0.031528" rpy="0 0 0"/>
+      <geometry><mesh filename="meshes/visual/right_foot.stl" scale="0.001 0.001 0.001"/></geometry>
+    </visual>
+  </link>
+
+  <!-- Right foot contact spheres (mirror of left) -->
+  <link name="right_foot_sphere_1_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+  <link name="right_foot_sphere_2_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+  <link name="right_foot_sphere_3_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+  <link name="right_foot_sphere_4_link">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.005"/></geometry></visual>
+    <collision><geometry><sphere radius="0.005"/></geometry></collision>
+  </link>
+
+  <!-- ==================== JOINTS ==================== -->
+
+  <joint name="torso_to_hip" type="fixed">
+    <parent link="torso"/>
+    <child link="hip"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Left leg joints -->
+  <joint name="left_hip1_joint" type="revolute">
+    <parent link="hip"/>
+    <child link="left_leg1"/>
+    <origin xyz="-0.068372 -0.029495 0.577401" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="left_hip2_joint" type="revolute">
+    <parent link="left_leg1"/>
+    <child link="left_leg2"/>
+    <origin xyz="0.068324 0 0" rpy="0 0 0"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="left_thigh_joint" type="revolute">
+    <parent link="left_leg2"/>
+    <child link="left_leg3"/>
+    <origin xyz="0 0 -0.113585" rpy="0 0 0"/>
+    <axis xyz="0.0 0.0 1.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="left_knee_joint" type="revolute">
+    <parent link="left_leg3"/>
+    <child link="left_leg4"/>
+    <origin xyz="0 0 -0.157478" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="left_ankle_joint" type="revolute">
+    <parent link="left_leg4"/>
+    <child link="left_foot"/>
+    <origin xyz="0.009628 -0.000505 -0.27481" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <!-- Left foot sphere joints (fixed) -->
+  <joint name="left_foot_sphere_1_joint" type="fixed">
+    <parent link="left_foot"/><child link="left_foot_sphere_1_link"/>
+    <origin xyz="0.03 -0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+  <joint name="left_foot_sphere_2_joint" type="fixed">
+    <parent link="left_foot"/><child link="left_foot_sphere_2_link"/>
+    <origin xyz="-0.03 -0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+  <joint name="left_foot_sphere_3_joint" type="fixed">
+    <parent link="left_foot"/><child link="left_foot_sphere_3_link"/>
+    <origin xyz="0.03 0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+  <joint name="left_foot_sphere_4_joint" type="fixed">
+    <parent link="left_foot"/><child link="left_foot_sphere_4_link"/>
+    <origin xyz="-0.03 0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Right leg joints -->
+  <joint name="right_hip1_joint" type="revolute">
+    <parent link="hip"/>
+    <child link="right_leg1"/>
+    <origin xyz="-0.2429 -0.029495 0.577401" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="right_hip2_joint" type="revolute">
+    <parent link="right_leg1"/>
+    <child link="right_leg2"/>
+    <origin xyz="-0.068323 0 0" rpy="0 0 0"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="right_thigh_joint" type="revolute">
+    <parent link="right_leg2"/>
+    <child link="right_leg3"/>
+    <origin xyz="0 0 -0.113585" rpy="0 0 0"/>
+    <axis xyz="0.0 0.0 1.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="right_knee_joint" type="revolute">
+    <parent link="right_leg3"/>
+    <child link="right_leg4"/>
+    <origin xyz="0 0 -0.157478" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="right_ankle_joint" type="revolute">
+    <parent link="right_leg4"/>
+    <child link="right_foot"/>
+    <origin xyz="-0.009628 -0.000505 -0.27481" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
+    <dynamics damping="1.0"/>
+  </joint>
+
+  <!-- Right foot sphere joints (fixed, mirrored from left) -->
+  <joint name="right_foot_sphere_1_joint" type="fixed">
+    <parent link="right_foot"/><child link="right_foot_sphere_1_link"/>
+    <origin xyz="0.03 -0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+  <joint name="right_foot_sphere_2_joint" type="fixed">
+    <parent link="right_foot"/><child link="right_foot_sphere_2_link"/>
+    <origin xyz="-0.03 -0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+  <joint name="right_foot_sphere_3_joint" type="fixed">
+    <parent link="right_foot"/><child link="right_foot_sphere_3_link"/>
+    <origin xyz="0.03 0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+  <joint name="right_foot_sphere_4_joint" type="fixed">
+    <parent link="right_foot"/><child link="right_foot_sphere_4_link"/>
+    <origin xyz="-0.03 0.08 -0.008" rpy="0 0 0"/>
+  </joint>
+
+</robot>
