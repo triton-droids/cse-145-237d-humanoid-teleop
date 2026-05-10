@@ -1,5 +1,9 @@
 """Launch the MuJoCo viewer for the lower-body inspection model."""
 
+# Usage (from project root):
+#   conda run -p .\.conda python demos\demo_mujoco_lower_body_viewer.py
+#   conda run -p .\.conda python demos\demo_mujoco_lower_body_viewer.py --animate --preset walking
+
 from __future__ import annotations
 
 import argparse

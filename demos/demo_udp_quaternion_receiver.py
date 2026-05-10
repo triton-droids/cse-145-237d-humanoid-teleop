@@ -1,5 +1,8 @@
 """Print live ESP32/BNO085 quaternion packet status on the compute node."""
 
+# Usage (from project root):
+#   conda run --no-capture-output -p .\.conda python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
+
 from __future__ import annotations
 
 import argparse

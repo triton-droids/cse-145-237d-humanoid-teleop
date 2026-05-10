@@ -1,5 +1,9 @@
 """Run a minimal lower-body inverse kinematics example."""
 
+# Usage (from project root):
+#   conda run -p .\.conda python demos\demo_inverse_kinematics.py
+#   conda run -p .\.conda python demos\demo_inverse_kinematics.py --plot
+
 from __future__ import annotations
 
 import argparse

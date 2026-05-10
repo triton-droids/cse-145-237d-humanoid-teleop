@@ -1,5 +1,8 @@
 """Aggregate seven segment orientations into a lower-body skeleton."""
 
+# Usage (from project root):
+#   conda run -p .\.conda python demos\demo_lower_body_aggregation.py
+
 from __future__ import annotations
 
 from pathlib import Path

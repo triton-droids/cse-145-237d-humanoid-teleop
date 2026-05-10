@@ -1,5 +1,8 @@
 """Measure UDP round-trip latency to one ESP32 node."""
 
+# Usage (from project root):
+#   conda run --no-capture-output -p .\.conda python demos\demo_udp_latency_ping.py <ESP32_IP> --port 5006
+
 from __future__ import annotations
 
 import argparse

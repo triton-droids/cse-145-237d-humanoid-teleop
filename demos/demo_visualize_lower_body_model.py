@@ -1,5 +1,9 @@
 """Visualize the lower-body model and mounted IMU frames."""
 
+# Usage (from project root):
+#   conda run -p .\.conda python demos\demo_visualize_lower_body_model.py
+#   conda run -p .\.conda python demos\demo_visualize_lower_body_model.py --output data\visualizations\lower_body_model.png
+
 from __future__ import annotations
 
 import argparse

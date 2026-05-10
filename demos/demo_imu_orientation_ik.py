@@ -1,5 +1,8 @@
 """Solve lower-limb joint rotations from segment-mounted IMU orientations."""
 
+# Usage (from project root):
+#   conda run -p .\.conda python demos\demo_imu_orientation_ik.py
+
 from __future__ import annotations
 
 from pathlib import Path
