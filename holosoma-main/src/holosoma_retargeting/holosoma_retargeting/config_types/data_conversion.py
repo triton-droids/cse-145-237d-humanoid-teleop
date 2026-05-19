@@ -38,7 +38,19 @@ _ROBOT_JOINT_NAMES_DEFAULT = {
         "right_wrist_roll_joint",
         "right_wrist_pitch_joint",
         "right_wrist_yaw_joint",
-    ]
+    ],
+    "ch_robot": [
+        "left_hip1_joint",
+        "left_hip2_joint",
+        "left_thigh_joint",
+        "left_knee_joint",
+        "left_ankle_joint",
+        "right_hip1_joint",
+        "right_hip2_joint",
+        "right_thigh_joint",
+        "right_knee_joint",
+        "right_ankle_joint",
+    ],
 }
 
 
@@ -79,6 +91,9 @@ class DataConversionConfig:
 
     once: bool = False
     """Run the motion once and exit."""
+
+    headless: bool = False
+    """Run conversion without launching the MuJoCo viewer."""
 
     use_omniretarget_data: bool = False
     """Use OmniRetarget data format."""

@@ -118,6 +118,7 @@ class MotionLoader:
         line_range: tuple[int, int] | None,
         has_dynamic_object: bool,
         use_omniretarget_data: bool,
+        robot_dof: int,
     ):
         self.motion_file = motion_file
         self.input_fps = input_fps
@@ -129,6 +130,7 @@ class MotionLoader:
         self.line_range = line_range
         self.has_dynamic_object = has_dynamic_object
         self.use_omniretarget_data = use_omniretarget_data
+        self.robot_dof = robot_dof
         self._load_motion()
         self._interpolate_motion()
         self._compute_velocities()
@@ -137,7 +139,9 @@ class MotionLoader:
         """Loads the motion from the csv file."""
         if self.motion_file.endswith(".npz"):
             data = np.load(self.motion_file)
-            self.input_fps = round(1 / data.get("fps", 1 / self.input_fps))
+            fps_value = float(np.asarray(data.get("fps", self.input_fps)).reshape(-1)[0])
+            self.input_fps = round(1 / fps_value) if 0 < fps_value < 1 else round(fps_value)
+            self.input_dt = 1.0 / self.input_fps
             motion = torch.from_numpy(data["qpos"]).to(torch.float32)
         else:
             raise ValueError("Unsupported motion file format. Use .csv or .npz.")
@@ -162,15 +166,22 @@ class MotionLoader:
             self.motion_base_poss_input = motion[:, :3]
             self.motion_base_rots_input = motion[:, 3:7]
 
-        self.motion_dof_poss_input = motion[:, 7:36]
+        dof_start = 7
+        dof_end = dof_start + self.robot_dof
+        self.motion_dof_poss_input = motion[:, dof_start:dof_end]
+        if self.motion_dof_poss_input.shape[1] != self.robot_dof:
+            raise ValueError(
+                f"Expected {self.robot_dof} robot DOF in {self.motion_file}, "
+                f"got {self.motion_dof_poss_input.shape[1]} from qpos shape {tuple(motion.shape)}"
+            )
 
         if self.has_dynamic_object:
             if self.use_omniretarget_data:
                 self.motion_object_poss_input = motion[:, -3:]
                 self.motion_object_rots_input = motion[:, -7:-3]
             else:
-                self.motion_object_poss_input = motion[:, -7:-4]
-                self.motion_object_rots_input = motion[:, -4:]
+                self.motion_object_poss_input = motion[:, dof_end : dof_end + 3]
+                self.motion_object_rots_input = motion[:, dof_end + 3 : dof_end + 7]
 
         self.input_frames = motion.shape[0]
         self.duration = (self.input_frames - 1) * self.input_dt
@@ -356,6 +367,7 @@ def world_body_velocities(model, data):
 def run_simulator(args_cli: DataConversionConfig):
     """Runs the simulation loop."""
     joint_names = args_cli.JOINT_NAMES
+    robot_dof = len(joint_names)
     # Load motion
     device = torch.device("cpu")
     has_dynamic_object = args_cli.has_dynamic_object
@@ -369,6 +381,7 @@ def run_simulator(args_cli: DataConversionConfig):
         line_range=line_range,
         has_dynamic_object=has_dynamic_object,
         use_omniretarget_data=use_omniretarget_data,
+        robot_dof=robot_dof,
     )
 
     object_name = args_cli.object_name
@@ -426,15 +439,17 @@ def run_simulator(args_cli: DataConversionConfig):
     print(dof_index_list)
 
     # Prepare mujoco viewer
-    viewer = mjv.launch_passive(robot, robot_data, show_left_ui=False, show_right_ui=False)
-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = 0
-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 0
-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 0
-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_COM] = 0
+    viewer = None
+    if not args_cli.headless:
+        viewer = mjv.launch_passive(robot, robot_data, show_left_ui=False, show_right_ui=False)
+        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = 0
+        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 0
+        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 0
+        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_COM] = 0
 
-    viewer.cam.distance = 2.0
-    viewer.cam.elevation = -20.0
-    viewer.cam.azimuth = 45.0
+        viewer.cam.distance = 2.0
+        viewer.cam.elevation = -20.0
+        viewer.cam.azimuth = 45.0
 
     log: dict[str, Any]
     if has_dynamic_object:
@@ -531,10 +546,12 @@ def run_simulator(args_cli: DataConversionConfig):
             )
 
         mujoco.mj_forward(robot, robot_data)
-        viewer.sync()
+        if viewer is not None:
+            viewer.sync()
 
         end_time = time.perf_counter()
-        time.sleep(max(0, motion.output_dt - (end_time - start_time)))
+        if viewer is not None:
+            time.sleep(max(0, motion.output_dt - (end_time - start_time)))
 
         if not file_saved:
             lin_vel_w, ang_vel_w = world_body_velocities(robot, robot_data)
@@ -597,7 +614,8 @@ def run_simulator(args_cli: DataConversionConfig):
 
         if args_cli.once and file_saved:
             print("[INFO]: Motion replay completed, exiting...")
-            viewer.close()
+            if viewer is not None:
+                viewer.close()
             break
 
 
