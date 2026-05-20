@@ -285,25 +285,3 @@ print("joint_names:", d["joint_names"].tolist())
 print("fps:", d["fps"].tolist())
 PY
 ```
-
-## Files to Commit
-
-Commit the code and documentation changes:
-
-```text
-scripts/setup_retargeting.sh
-scripts/source_retargeting_setup.sh
-src/holosoma_retargeting/holosoma_retargeting/config_types/data_conversion.py
-src/holosoma_retargeting/holosoma_retargeting/data_conversion/convert_data_format_mj.py
-docs/ch-robot-retargeting-converter-update.md
-```
-
-Do not commit datasets or generated outputs:
-
-```text
-OMOMO_new.zip
-demo_data/OMOMO_new/*.pt
-demo_results/
-converted_res/
-.firecrawl/
-```
