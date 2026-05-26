@@ -1,0 +1,34 @@
+.DS_Store
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Local environment files
+.env
+.python.env
+secrets.h
+
+# Generated simulation/training artifacts
+logs/
+outputs/
+test5/
+wandb/
+runs/
+events.out.tfevents.*
+*.pth
+*.pt
+*.pkl
+
+# Local scraping/tooling cache
+.firecrawl/
