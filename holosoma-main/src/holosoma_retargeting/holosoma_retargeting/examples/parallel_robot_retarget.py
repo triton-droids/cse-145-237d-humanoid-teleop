@@ -242,6 +242,10 @@ def process_single_task(args):
             human_joints, retargeter.demo_joints, toe_names
         )
 
+        if robot_config.robot_type == "ch_robot":
+            for fs in foot_sticking_sequences:
+                fs["L_Toe"], fs["R_Toe"] = fs["R_Toe"], fs["L_Toe"]
+
         # Task-specific foot sticking adjustments
         if task_type == "object_interaction":
             # Disable initial sticking

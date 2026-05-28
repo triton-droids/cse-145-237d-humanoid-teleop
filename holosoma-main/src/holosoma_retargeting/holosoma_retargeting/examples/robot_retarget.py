@@ -700,9 +700,8 @@ def main(cfg: RetargetingConfig) -> None:
     # constraint matches XML body names via the substrings "left" / "right", so we swap the
     # human L/R contact flags here to pin the foot that is actually planted on the ground.
     if cfg.robot_config.robot_type == "ch_robot":
-        l_name, r_name = toe_names[0], toe_names[1]
         for fs in foot_sticking_sequences:
-            fs[l_name], fs[r_name] = fs[r_name], fs[l_name]
+            fs["L_Toe"], fs["R_Toe"] = fs["R_Toe"], fs["L_Toe"]
 
     # Task-specific foot sticking adjustments
     if task_type == "object_interaction":

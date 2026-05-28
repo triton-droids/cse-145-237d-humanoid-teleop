@@ -721,12 +721,13 @@ class InteractionMeshRetargeter:
                     ]
 
         # Non-penetration constraints
-        Js, phis = self._update_jacobians_and_phis_from_q(q)
-        for key, phi in phis.items():
-            Ja_n_full = Js[key]
-            Ja_n = Ja_n_full[self.q_a_indices]
-            rhs = -phi - self.penetration_tolerance
-            constraints += [Ja_n @ dqa >= rhs]
+        if self.activate_obj_non_penetration:
+            Js, phis = self._update_jacobians_and_phis_from_q(q)
+            for key, phi in phis.items():
+                Ja_n_full = Js[key]
+                Ja_n = Ja_n_full[self.q_a_indices]
+                rhs = -phi - self.penetration_tolerance
+                constraints += [Ja_n @ dqa >= rhs]
 
         # Self-collision constraints
         Js_sc, phis_sc = self._compute_self_collision_constraints(frame_idx)

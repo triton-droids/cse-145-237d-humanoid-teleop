@@ -209,6 +209,17 @@ JOINTS_MAPPINGS = {
         "LeftHand": "left_hand_sphere_link",
         "RightHand": "right_hand_sphere_link",
     },
+    ("lafan", "ch_robot"): {
+        "Spine1": "pelvis_marker",
+        "LeftUpLeg": "right_hip_marker",
+        "RightUpLeg": "left_hip_marker",
+        "LeftLeg": "right_knee_marker",
+        "RightLeg": "left_knee_marker",
+        "LeftFoot": "right_ankle_marker",
+        "RightFoot": "left_ankle_marker",
+        "LeftToeBase": "right_foot_sphere_3_link",
+        "RightToeBase": "left_foot_sphere_3_link",
+    },
     ("smplh", "g1"): {
         "Pelvis": "pelvis_contour_link",
         "L_Hip": "left_hip_pitch_link",
