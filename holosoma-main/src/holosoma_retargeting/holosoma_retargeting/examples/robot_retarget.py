@@ -396,10 +396,15 @@ def _compute_q_init_base(
     if task_type == "robot_only":
         if data_format == "lafan":
             spine_joint_idx = constants.DEMO_JOINTS.index("Spine1")
-            human_quat_init = estimate_human_orientation(human_joints, constants.DEMO_JOINTS)
+            human_quat_init = estimate_human_orientation(
+                human_joints,
+                constants.DEMO_JOINTS,
+                robot_forward_axis=getattr(constants, "ROBOT_FORWARD_AXIS", "+x"),
+            )
+            q_joints_init = getattr(constants, "Q_INIT_JOINTS", np.zeros(constants.ROBOT_DOF))
             # MuJoCo order: pos first, then quat
             q_init_base = np.concatenate(
-                [human_joints[0, spine_joint_idx, :3], human_quat_init, np.zeros(constants.ROBOT_DOF)]
+                [human_joints[0, spine_joint_idx, :3], human_quat_init, q_joints_init]
             )
         else:  # smplh
             _, human_quat_init = transform_from_human_to_world(

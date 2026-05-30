@@ -748,12 +748,57 @@ def transform_y_up_to_z_up(points):
     raise ValueError(f"Unsupported number of dimensions: {points.ndim}")
 
 
-def estimate_human_orientation(human_joints, joint_names, frame_idx=0):
+def _hip_joint_names(joint_names):
+    if "LeftUpLeg" in joint_names and "RightUpLeg" in joint_names:
+        return "LeftUpLeg", "RightUpLeg"
+    if "L_Hip" in joint_names and "R_Hip" in joint_names:
+        return "L_Hip", "R_Hip"
+    raise ValueError("Could not find left/right hip joints in motion data")
+
+
+def estimate_human_forward_yaw(human_joints, joint_names, frame_idx=0):
+    """Estimate the human heading yaw from the hip line in the world XY plane."""
+    left_hip_name, right_hip_name = _hip_joint_names(joint_names)
+    left_hip_pos = human_joints[frame_idx, joint_names.index(left_hip_name)]
+    right_hip_pos = human_joints[frame_idx, joint_names.index(right_hip_name)]
+
+    right_vec = right_hip_pos[:2] - left_hip_pos[:2]
+    if np.linalg.norm(right_vec) > 1e-6:
+        right_vec = right_vec / np.linalg.norm(right_vec)
+    else:
+        right_vec = np.array([1.0, 0.0])
+
+    # In a right-handed character frame, forward = world_up x local_right.
+    forward_vec = np.array([-right_vec[1], right_vec[0]])
+    return float(np.arctan2(forward_vec[1], forward_vec[0]))
+
+
+def adjust_yaw_for_robot_forward_axis(human_forward_yaw, robot_forward_axis="+x"):
+    """Convert a world human-forward yaw into a base yaw for a robot-local forward axis."""
+    local_forward_yaws = {
+        "+x": 0.0,
+        "x": 0.0,
+        "-x": np.pi,
+        "+y": np.pi / 2,
+        "y": np.pi / 2,
+        "-y": -np.pi / 2,
+    }
+    if robot_forward_axis not in local_forward_yaws:
+        raise ValueError(f"Unsupported robot_forward_axis: {robot_forward_axis!r}")
+    return float(human_forward_yaw - local_forward_yaws[robot_forward_axis])
+
+
+def yaw_to_quat_wxyz(yaw):
+    """Return a yaw-only quaternion in MuJoCo/scalar-first order."""
+    return np.array([np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)])
+
+
+def estimate_human_orientation(human_joints, joint_names, frame_idx=0, robot_forward_axis="+x"):
     """
     Estimate the human's global orientation quaternion based on joint positions.
 
-    This function estimates the human's orientation by looking at the direction
-    from the pelvis (Hips) to the spine/chest, and the direction from left to right hip.
+    This function preserves the existing human orientation estimate for +X-facing
+    robots, and applies a yaw correction for robots with another local forward axis.
 
     Args:
         human_joints (np.ndarray): Human joint positions with shape (frames, joints, 3)
@@ -761,7 +806,7 @@ def estimate_human_orientation(human_joints, joint_names, frame_idx=0):
         frame_idx (int): Frame index to estimate orientation from (default: 0)
 
     Returns:
-        np.ndarray: Quaternion [w, x, y, z] representing the human's global orientation
+        np.ndarray: Quaternion [w, x, y, z] representing the robot root orientation.
     """
     # For LAFAN
     if "Hips" in joint_names:
@@ -816,4 +861,10 @@ def estimate_human_orientation(human_joints, joint_names, frame_idx=0):
     rotation_matrix = np.column_stack([forward_vec, left_vec, up_vec])
     assert np.linalg.det(rotation_matrix) > 0
     rotation = R.from_matrix(rotation_matrix)
-    return rotation.as_quat(scalar_first=True)
+
+    if robot_forward_axis in ("+x", "x"):
+        return rotation.as_quat(scalar_first=True)
+
+    human_forward_yaw = np.arctan2(forward_vec[1], forward_vec[0])
+    robot_yaw = adjust_yaw_for_robot_forward_axis(human_forward_yaw, robot_forward_axis)
+    return yaw_to_quat_wxyz(robot_yaw)

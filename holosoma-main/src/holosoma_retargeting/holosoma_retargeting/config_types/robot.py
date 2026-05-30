@@ -13,15 +13,16 @@ class RobotDefaults(TypedDict):
     robot_dof: int
     robot_height: float
     object_name: str
+    forward_axis: str
 
 
 _ROBOT_DEFAULTS: dict[str, RobotDefaults] = {
-    "g1": {"robot_dof": 29, "robot_height": 1.32, "object_name": "ground"},
-    "t1": {"robot_dof": 23, "robot_height": 1.2, "object_name": "ground"},
+    "g1": {"robot_dof": 29, "robot_height": 1.32, "object_name": "ground", "forward_axis": "+x"},
+    "t1": {"robot_dof": 23, "robot_height": 1.2, "object_name": "ground", "forward_axis": "+x"},
     # robot_height controls scale = robot_height / human_height. With Pelvis->pelvis_marker
     # mapping, the scaled human pelvis target lands directly at the robot's hip pivot height
     # (no torso offset). For natural standing (feet on ground, hip ~0.5m up), use ~1.0m.
-    "ch_robot": {"robot_dof": 10, "robot_height": 1.0, "object_name": "ground"},
+    "ch_robot": {"robot_dof": 10, "robot_height": 1.0, "object_name": "ground", "forward_axis": "+y"},
 }
 
 
@@ -75,6 +76,7 @@ class RobotConfig:
     robot_height: float | None = None
     robot_name: str | None = None
     robot_urdf_file: str | None = None
+    robot_forward_axis: str | None = None
 
     # Joint definitions (optional overrides)
     foot_sticking_links: list[str] | None = None
@@ -128,6 +130,17 @@ class RobotConfig:
         return f"models/{self.robot_type}/{self.robot_type}_{self.ROBOT_DOF}dof.urdf"
 
     ROBOT_URDF_FILE = property(_robot_urdf_file, doc="Get robot URDF file path.")
+
+    def _robot_forward_axis(self) -> str:
+        """Get the robot-local horizontal axis that points forward."""
+        if self.robot_forward_axis is not None:
+            return self.robot_forward_axis
+        return self.robot_defaults[self.robot_type].get("forward_axis", "+x")
+
+    ROBOT_FORWARD_AXIS = property(
+        _robot_forward_axis,
+        doc="Get robot-local horizontal axis that points forward.",
+    )
 
     def _foot_sticking_links(self) -> list[str]:
         """Get foot sticking links - use override if provided, else use robot_type default."""

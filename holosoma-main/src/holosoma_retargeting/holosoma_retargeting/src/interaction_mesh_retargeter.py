@@ -27,12 +27,15 @@ from mujoco_utils import (  # type: ignore[import-not-found,no-redef]  # noqa: E
     _world_mesh_from_geom,
 )
 from utils import (  # type: ignore[import-not-found,no-redef]  # noqa: E402
+    adjust_yaw_for_robot_forward_axis,
     calculate_laplacian_coordinates,
     calculate_laplacian_matrix,
     create_interaction_mesh,
+    estimate_human_forward_yaw,
     get_adjacency_list,
     transform_points_local_to_world,
     transform_points_world_to_local,
+    yaw_to_quat_wxyz,
 )
 from viser_utils import create_motion_control_sliders  # type: ignore[import-not-found,no-redef]  # noqa: E402
 
@@ -424,36 +427,22 @@ class InteractionMeshRetargeter:
             q_locked_list[0, self.q_a_indices] = q_a_init[self.q_a_indices]
 
             if self.fix_orientation:
-                # Compute per-frame yaw from human hip positions so the robot
-                # turns with the human while keeping pitch/roll fixed at zero.
-                l_hip_name = "L_Hip"
-                r_hip_name = "R_Hip"
-                if l_hip_name in self.demo_joints and r_hip_name in self.demo_joints:
-                    l_hip_idx = self.demo_joints.index(l_hip_name)
-                    r_hip_idx = self.demo_joints.index(r_hip_name)
-                    yaws = np.zeros(num_frames)
-                    for i in range(num_frames):
-                        l_hip = human_joint_motions[i, l_hip_idx, :]
-                        r_hip = human_joint_motions[i, r_hip_idx, :]
-                        # Hip-to-hip vector projected to xy plane
-                        hip_vec = r_hip[:2] - l_hip[:2]
-                        # Forward direction (perpendicular to hip vector, 90° CCW)
-                        forward = np.array([-hip_vec[1], hip_vec[0]])
-                        yaw = np.arctan2(forward[1], forward[0])
-                        yaws[i] = yaw
-                        # Quaternion for yaw-only rotation around z (MuJoCo order: w,x,y,z)
-                        q_locked_list[i, 3] = np.cos(yaw / 2)  # w
-                        q_locked_list[i, 4] = 0.0               # x
-                        q_locked_list[i, 5] = 0.0               # y
-                        q_locked_list[i, 6] = np.sin(yaw / 2)  # z
-                    print(f"[fix_orientation] Per-frame yaw: min={np.degrees(yaws.min()):.1f}° "
-                          f"max={np.degrees(yaws.max()):.1f}° range={np.degrees(yaws.max()-yaws.min()):.1f}°")
-                else:
-                    # Fallback: propagate the initial quaternion to all frames
-                    q_locked_list[:, 3:7] = q_a_init[3:7]
-                    print("[fix_orientation] Fallback: using constant initial quaternion")
+                yaws = np.zeros(num_frames)
+                robot_forward_axis = getattr(self.task_constants, "ROBOT_FORWARD_AXIS", "+x")
+                for i in range(num_frames):
+                    yaws[i] = adjust_yaw_for_robot_forward_axis(
+                        estimate_human_forward_yaw(human_joint_motions, self.demo_joints, i),
+                        robot_forward_axis,
+                    )
+                    q_locked_list[i, 3:7] = yaw_to_quat_wxyz(yaws[i])
+                print(
+                    f"[fix_orientation] Per-frame yaw: min={np.degrees(yaws.min()):.1f}deg "
+                    f"max={np.degrees(yaws.max()):.1f}deg "
+                    f"range={np.degrees(yaws.max() - yaws.min()):.1f}deg"
+                )
 
-        q_locked_list[:, -7:] = object_poses_augmented
+        if self.has_dynamic_object:
+            q_locked_list[:, -7:] = object_poses_augmented
         q = np.copy(q_locked_list[0])
         retargeted_motions = [q]
 

@@ -11,4 +11,5 @@ echo "conda environment name is set to: $CONDA_ENV_NAME"
 
 source ${SCRIPT_DIR}/source_common.sh
 source ${CONDA_ROOT}/bin/activate $CONDA_ENV_NAME
+unalias python python3 pip pip3 tensorboard 2>/dev/null || true
 export OMNI_KIT_ACCEPT_EULA=1
