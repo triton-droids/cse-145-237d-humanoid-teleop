@@ -6,6 +6,7 @@
   Install Arduino libraries:
     - Adafruit BNO08x
     - Adafruit BusIO
+    - Adafruit NeoPixel
 
   Optional local secrets file, not committed:
     hardware/esp32_bno085_udp/secrets.h
@@ -17,6 +18,7 @@
 */
 
 #include <Adafruit_BNO08x.h>
+#include <Adafruit_NeoPixel.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
@@ -78,6 +80,20 @@
 #define WIFI_CONNECT_TIMEOUT_MS 20000
 #endif
 
+#ifndef LED_PIN
+// ESP32-S3-DevKitC-1 v1.1 onboard addressable RGB LED.
+#define LED_PIN 38
+#endif
+
+#ifndef LED_BRIGHTNESS
+// Keep the onboard RGB LED visible but not distracting.
+#define LED_BRIGHTNESS 16
+#endif
+
+#ifndef WIFI_LED_PULSE_PERIOD_MS
+#define WIFI_LED_PULSE_PERIOD_MS 2000
+#endif
+
 static constexpr uint8_t PACKET_VERSION = 1;
 static constexpr uint8_t QUAT_ORDER_WXYZ = 1;
 static constexpr uint8_t REPORT_TYPE_ROTATION_VECTOR = 1;
@@ -103,6 +119,7 @@ struct __attribute__((packed)) QuaternionPacket {
 static_assert(sizeof(QuaternionPacket) == 40, "QuaternionPacket must stay 40 bytes");
 
 Adafruit_BNO08x bno08x;
+Adafruit_NeoPixel rgb_led(1, LED_PIN, NEO_GRB + NEO_KHZ800);
 WiFiUDP udp;
 uint32_t sequence_number = 0;
 uint32_t sent_packets = 0;
@@ -113,6 +130,79 @@ float last_qw = 0.0f;
 float last_qx = 0.0f;
 float last_qy = 0.0f;
 float last_qz = 0.0f;
+
+uint32_t ledColor(uint8_t red, uint8_t green, uint8_t blue) {
+  return rgb_led.Color(
+      static_cast<uint8_t>((red * LED_BRIGHTNESS) / 255),
+      static_cast<uint8_t>((green * LED_BRIGHTNESS) / 255),
+      static_cast<uint8_t>((blue * LED_BRIGHTNESS) / 255));
+}
+
+uint32_t ledColorScaled(uint8_t red, uint8_t green, uint8_t blue, uint8_t brightness) {
+  return rgb_led.Color(
+      static_cast<uint8_t>((red * brightness) / 255),
+      static_cast<uint8_t>((green * brightness) / 255),
+      static_cast<uint8_t>((blue * brightness) / 255));
+}
+
+uint32_t segmentLedColor(uint8_t segment_id) {
+  switch (segment_id) {
+    case 0:  // pelvis
+      return ledColor(255, 255, 255);
+    case 1:  // left_thigh
+      return ledColor(0, 220, 80);
+    case 2:  // left_shank
+      return ledColor(255, 230, 0);
+    case 3:  // left_foot
+      return ledColor(0, 60, 255);
+    case 4:  // right_thigh
+      return ledColor(255, 140, 0);
+    case 5:  // right_shank
+      return ledColor(190, 70, 255);
+    case 6:  // right_foot
+      return ledColor(255, 40, 40);
+    default:
+      return ledColor(80, 80, 80);
+  }
+}
+
+const char *segmentName(uint8_t segment_id) {
+  switch (segment_id) {
+    case 0:
+      return "pelvis";
+    case 1:
+      return "left_thigh";
+    case 2:
+      return "left_shank";
+    case 3:
+      return "left_foot";
+    case 4:
+      return "right_thigh";
+    case 5:
+      return "right_shank";
+    case 6:
+      return "right_foot";
+    default:
+      return "unknown";
+  }
+}
+
+void setLed(uint32_t color) {
+  rgb_led.setPixelColor(0, color);
+  rgb_led.show();
+}
+
+void updateWifiConnectingLed() {
+  const uint32_t phase_ms = millis() % WIFI_LED_PULSE_PERIOD_MS;
+  const uint32_t half_period_ms = WIFI_LED_PULSE_PERIOD_MS / 2;
+  const uint32_t ramp_ms = phase_ms < half_period_ms
+      ? phase_ms
+      : WIFI_LED_PULSE_PERIOD_MS - phase_ms;
+  const uint8_t min_brightness = 2;
+  const uint8_t brightness = min_brightness
+      + static_cast<uint8_t>((ramp_ms * (LED_BRIGHTNESS - min_brightness)) / half_period_ms);
+  setLed(ledColorScaled(0, 0, 255, brightness));
+}
 
 const char *wifiStatusName(wl_status_t status) {
   switch (status) {
@@ -168,6 +258,7 @@ void printWifiScan() {
 }
 
 bool connectWiFi() {
+  updateWifiConnectingLed();
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(true, true);
   delay(200);
@@ -190,6 +281,7 @@ bool connectWiFi() {
   const unsigned long start_ms = millis();
   wl_status_t last_status = WL_IDLE_STATUS;
   while (millis() - start_ms < WIFI_CONNECT_TIMEOUT_MS) {
+    updateWifiConnectingLed();
     const wl_status_t status = WiFi.status();
     if (status == WL_CONNECTED) {
       Serial.println("Wi-Fi connected.");
@@ -200,6 +292,7 @@ bool connectWiFi() {
       Serial.print("RSSI: ");
       Serial.print(WiFi.RSSI());
       Serial.println(" dBm");
+      setLed(ledColor(0, 255, 0));
       return true;
     }
 
@@ -214,6 +307,7 @@ bool connectWiFi() {
 
   Serial.println();
   Serial.println("Wi-Fi connection timed out.");
+  setLed(ledColor(255, 0, 0));
   Serial.print("Final Wi-Fi status: ");
   Serial.println(wifiStatusName(WiFi.status()));
   Serial.println("Hints:");
@@ -230,6 +324,7 @@ void setupBNO085() {
   if (!bno08x.begin_UART(&Serial1)) {
     Serial.println("Could not find BNO085 over UART");
     Serial.println("Check wiring, BNO085 mode pins, and UART RX/TX crossing.");
+    setLed(ledColor(255, 0, 0));
     while (true) {
       delay(1000);
     }
@@ -237,6 +332,7 @@ void setupBNO085() {
 
   if (!bno08x.enableReport(SH2_ROTATION_VECTOR, REPORT_INTERVAL_US)) {
     Serial.println("Could not enable BNO085 rotation vector report");
+    setLed(ledColor(255, 0, 0));
     while (true) {
       delay(1000);
     }
@@ -339,7 +435,21 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
+  rgb_led.begin();
+  rgb_led.clear();
+  rgb_led.show();
+  setLed(ledColor(255, 180, 0));
+
   Serial.println("ESP32-S3 BNO085 UART UDP streamer");
+  Serial.print("Sensor ID: ");
+  Serial.println(SENSOR_ID);
+  Serial.print("Segment ID: ");
+  Serial.print(SEGMENT_ID);
+  Serial.print(" (");
+  Serial.print(segmentName(SEGMENT_ID));
+  Serial.println(")");
+  Serial.print("Segment LED color is assigned from segment ID on GPIO ");
+  Serial.println(LED_PIN);
   Serial.print("ESP32 RX data-in pin, from BNO085 SDA/UART-TX: GPIO ");
   Serial.println(BNO08X_RX_PIN);
   Serial.print("ESP32 TX data-out pin, to BNO085 SCL/UART-RX: GPIO ");
@@ -352,6 +462,7 @@ void setup() {
   udp.begin(ESP32_UDP_LOCAL_PORT);
   setupBNO085();
 
+  setLed(segmentLedColor(SEGMENT_ID));
   Serial.println("Streaming BNO085 rotation-vector quaternions over UDP");
 }
 

@@ -1,9 +1,9 @@
 """Live lower-body skeleton from a partial IMU set (default: pelvis + 2 thighs).
 
 Usage (from project root):
-  conda run --no-capture-output -p .\.conda python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005
-  conda run --no-capture-output -p .\.conda python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config shanks
-  conda run --no-capture-output -p .\.conda python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config full
+  conda run --no-capture-output -n humanoid-sim python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005
+  conda run --no-capture-output -n humanoid-sim python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config shanks
+  conda run --no-capture-output -n humanoid-sim python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config full
 """
 
 from __future__ import annotations
@@ -87,6 +87,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-samples", type=int, default=20,
         help="still-standing samples per segment needed to finish calibration",
+    )
+    parser.add_argument(
+        "--no-prompt-calibration",
+        action="store_true",
+        help="Start neutral calibration without waiting for Enter; useful from the demo launcher.",
+    )
+    parser.add_argument(
+        "--calibration-delay-s",
+        type=float,
+        default=1.0,
+        help="Delay before automatic calibration when --no-prompt-calibration is used.",
     )
     return parser.parse_args()
 
@@ -268,7 +279,14 @@ def main() -> None:
     ax.set_title("Waiting to calibrate — check the terminal")
     plt.pause(0.01)
 
-    input("Stand in neutral position, feet shoulder-width apart, then press Enter to calibrate... ")
+    if args.no_prompt_calibration:
+        print(f"Auto-calibrating in {args.calibration_delay_s:.1f}s — stand still in neutral pose.")
+        time.sleep(max(0.0, args.calibration_delay_s))
+    else:
+        try:
+            input("Stand in neutral position, feet shoulder-width apart, then press Enter to calibrate... ")
+        except EOFError:
+            print("No stdin available; calibrating automatically. Stand still in neutral pose.")
     ax.set_title("Calibrating — stand still...")
     fig.canvas.draw_idle()
     plt.pause(0.01)

@@ -37,5 +37,5 @@ IDs. It should consume calibrated segment orientations after `sensor/` and
 Aggregation demo:
 
 ```powershell
-conda run -p .\.conda python demos\demo_lower_body_aggregation.py
+conda run --no-capture-output -n humanoid-sim python demos\demo_lower_body_aggregation.py
 ```

@@ -7,7 +7,8 @@ The target hardware path is:
 
 ```text
 BNO085 quaternion streams on 7 ESP32-S3 nodes
-    -> direct Wi-Fi UDP to Jetson Nano
+    -> Wi-Fi UDP over the shared phone hotspot
+    -> laptop or other receiver on the same hotspot
     -> sensor packet normalization
     -> neutral-pose and functional calibration
     -> sensor-to-segment alignment
@@ -24,8 +25,9 @@ real-world wearable pipeline.
 The BNO085 provides fused orientation quaternions directly. Our current input
 contract is therefore quaternion packets, not raw accel/gyro fusion.
 
-Each ESP32-S3 streams directly to the Jetson over UDP. The pelvis ESP32 is not
-the hub in the first architecture; it is just another sensor node.
+Each ESP32-S3 streams directly to the receiver over UDP. The phone hotspot is
+only the Wi-Fi network; it is not the packet hub. The pelvis ESP32 is also just
+another sensor node.
 
 Expected packet shape:
 
@@ -124,26 +126,32 @@ CalibrationProfile:
 Because local shell activation has been unreliable, prefer `conda run`:
 
 ```powershell
-conda run -p .\.conda python -m pytest -q
+conda run --no-capture-output -n humanoid-sim python -m pytest -q
+```
+
+Demo launcher:
+
+```powershell
+conda run --no-capture-output -n humanoid-sim python demos\demo_launcher.py
 ```
 
 Archived MuJoCo viewer:
 
 ```powershell
-conda run -p .\.conda python demos\demo_mujoco_lower_body_viewer.py
+conda run --no-capture-output -n humanoid-sim python demos\demo_mujoco_lower_body_viewer.py
 ```
 
 Orientation IK demo:
 
 ```powershell
-conda run -p .\.conda python demos\demo_imu_orientation_ik.py
+conda run --no-capture-output -n humanoid-sim python demos\demo_imu_orientation_ik.py
 ```
 
 ## Development Direction
 The next real work should happen in this order:
 
 ```text
-1. flash one ESP32-S3/BNO085 node and receive UDP packets on the Jetson
+1. flash one ESP32-S3/BNO085 node and receive UDP packets on the laptop over the phone hotspot
 2. flash all 7 nodes with unique sensor_id and segment_id settings
 3. tune quaternion spike filtering with real packet traces
 4. validate neutral standing calibration
@@ -161,7 +169,7 @@ people first, then tested with simulation as a convenience.
 Implemented so far:
 
 - ESP32-S3/BNO085 UDP packet firmware scaffold
-- Jetson-side binary quaternion packet parser
+- receiver-side binary quaternion packet parser
 - latest-packet UDP receiver buffer
 - quaternion norm/stale/spike filtering
 - SLERP smoothing

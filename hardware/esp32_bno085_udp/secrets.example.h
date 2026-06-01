@@ -10,14 +10,14 @@
 #define ESP32_UDP_LOCAL_PORT 5006
 
 // Segment IDs:
-// 0 pelvis
-// 1 left_thigh
-// 2 left_shank
-// 3 left_foot
-// 4 right_thigh
-// 5 right_shank
-// 6 right_foot
-// 255 unknown
+// 0 pelvis      LED white
+// 1 left_thigh  LED green
+// 2 left_shank  LED yellow
+// 3 left_foot   LED blue
+// 4 right_thigh LED orange
+// 5 right_shank LED purple
+// 6 right_foot  LED red
+// 255 unknown   LED gray
 #define SENSOR_ID 0
 #define SEGMENT_ID 255
 

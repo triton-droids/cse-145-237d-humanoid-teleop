@@ -8,7 +8,8 @@ Near-term target:
 BNO085 on each ESP32-S3
     -> fused quaternion report
     -> 40-byte UDP packet
-    -> direct Wi-Fi send to Jetson Nano
+    -> Wi-Fi UDP over the shared phone hotspot
+    -> laptop or other receiver on the same hotspot
     -> sensor/ normalization layer
 ```
 
@@ -27,20 +28,21 @@ Responsibilities:
 
 ## Network Architecture
 
-Use direct ESP32-S3 to Jetson UDP first:
+Use direct ESP32-S3 to receiver UDP over the phone hotspot first:
 
 ```text
 ESP32-S3 pelvis      \
 ESP32-S3 left thigh   \
 ESP32-S3 left shank    \
-ESP32-S3 left foot      -> Jetson UDP receiver
+ESP32-S3 left foot      -> laptop UDP receiver
 ESP32-S3 right thigh   /
 ESP32-S3 right shank  /
 ESP32-S3 right foot  /
 ```
 
-The pelvis ESP32-S3 is not the hub in the current design. Direct-to-Jetson keeps
-the first system easier to debug: one dropped sensor does not block the rest.
+The pelvis ESP32-S3 is not the hub in the current design. The phone hotspot only
+provides Wi-Fi connectivity; each ESP32 sends its own UDP packets to the
+receiver IP.
 
 ## ESP32 Firmware
 
@@ -119,8 +121,9 @@ The password/security settings are probably wrong.
 Wi-Fi connected, but receiver is silent
 ```
 
-Check `JETSON_IP`, Windows Firewall, and that the laptop/Jetson receiver is
-listening on `0.0.0.0:5005`.
+Check `JETSON_IP`, macOS/Windows firewall rules, and that the laptop receiver
+is listening on `0.0.0.0:5005`. In this firmware, `JETSON_IP` still means
+"receiver IP"; set it to the laptop IP on the phone hotspot.
 
 ## UDP Timing Checks
 
@@ -146,7 +149,7 @@ ESP32_UDP_LOCAL_PORT = 5006
 Run the quaternion receiver:
 
 ```powershell
-conda run --no-capture-output -p .\.conda python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
+conda run --no-capture-output -n humanoid-sim python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
 ```
 
 The receiver reports:
@@ -158,11 +161,11 @@ The receiver reports:
 - `drops`: inferred sequence-number drops
 
 True one-way latency cannot be measured from `ESP32 micros()` alone because the
-ESP32 clock and laptop/Jetson clock are not synchronized. For a practical latency
+ESP32 clock and laptop clock are not synchronized. For a practical latency
 number, measure round-trip time:
 
 ```powershell
-conda run --no-capture-output -p .\.conda python demos\demo_udp_latency_ping.py 192.168.1.164 --port 5006
+conda run --no-capture-output -n humanoid-sim python demos\demo_udp_latency_ping.py 192.168.1.164 --port 5006
 ```
 
 Use the ESP32 IP printed by Serial Monitor.
