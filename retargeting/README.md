@@ -21,6 +21,7 @@ https://github.com/triton-droids/simulation
 | Path | Purpose |
 |---|---|
 | `ch_robot_contract.py` | Joint order and shape contract for Triton humanoid retargeting files. |
+| `holosoma-source.md` | Pointer to the full Holosoma source branch and recommended worktree workflow. |
 | `holosoma-ch-robot-converter-update.md` | Notes from the CH robot Holosoma converter update and validation runs. |
 | `patches/0001-Add-ch_robot-support-to-retargeting-converter.patch` | Minimal Holosoma patch that adds `ch_robot` converter support. |
 | `examples/retargeting_contract_example.json` | Small example of the expected contract and output shapes. |
@@ -77,7 +78,14 @@ For `ch_robot`, `joint_pos` has width 17 and `joint_vel` has width 16 because Mu
 
 ## Holosoma Integration
 
-Apply the patch in `patches/` to a Holosoma checkout instead of copying Holosoma into this repository. The patch adds:
+The full Holosoma source used for this project is preserved on the
+`retargeting_holosoma` branch:
+
+https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/retargeting_holosoma
+
+See [`holosoma-source.md`](holosoma-source.md) for the recommended worktree
+workflow. Apply the patch in `patches/` to a Holosoma checkout instead of
+copying Holosoma into this branch. The patch adds:
 
 - `ch_robot` default joint order
 - dynamic robot DOF slicing instead of hardcoded G1 29-DOF slicing

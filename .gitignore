@@ -1,8 +1,12 @@
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.zip
 *.tar
 *.tar.gz
 *.7z
+*.rar
+*.dmg
 
 # Python
 __pycache__/
@@ -13,11 +17,23 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.conda/
+.pip-cache/
+
+# Editor/project-local files
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # Local environment files
 .env
+.env.*
+!.env.example
 .python.env
 secrets.h
+*.pem
+*.key
 
 # Generated simulation/training artifacts
 logs/
@@ -29,6 +45,16 @@ events.out.tfevents.*
 *.pth
 *.pt
 *.pkl
+*.bag
+*.mcap
+*.h5
+*.hdf5
+
+# Downloaded third-party source trees or local reference copies
+holosoma-main/
+
+# Private project admin files
+CSE 145 Team List*.md
 
 # Local scraping/tooling cache
 .firecrawl/

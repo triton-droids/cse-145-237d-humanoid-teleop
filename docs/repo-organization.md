@@ -9,6 +9,7 @@ cse-145-237d-humanoid-teleop/
 ├── retargeting/               # Triton humanoid retargeting contract and Holosoma patch
 ├── simulation/                # Link to the dedicated Isaac Lab simulation repo
 ├── data/retargeting_samples/  # Small sample captures
+├── data/retargeting_experiments/ # Curated small validation outputs
 ├── docs/                      # Project documentation
 ├── reports/                   # Class deliverables
 └── media/                     # Demo images and videos
@@ -25,6 +26,7 @@ Keep these files clean enough to make the repository public:
 - `docs/replication-guide.md`
 - `docs/system-architecture.md`
 - `retargeting/README.md`
+- `data/retargeting_experiments/README.md`
 - `reports/`
 - `media/`
 
@@ -35,6 +37,22 @@ Isaac Lab training source and robot simulation assets are intentionally kept in 
 https://github.com/triton-droids/simulation
 
 This avoids duplicating large meshes, USD assets, training scripts, checkpoints, and generated logs inside the course hub repository. Use [`../simulation/README.md`](../simulation/README.md) for the pinned commit reference.
+
+## Wearable IMU Source
+
+The wearable IMU and inverse-kinematics code was originally developed on the `inverse-kinematics` branch:
+
+https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/inverse-kinematics
+
+In this integrated branch, that source is organized under [`../wearable_imu/`](../wearable_imu/). Use [`../wearable_imu/source-branch.md`](../wearable_imu/source-branch.md) for the branch-to-folder mapping and sync policy.
+
+## Holosoma Retargeting Source
+
+The full Holosoma integration source is intentionally kept on the `retargeting_holosoma` branch:
+
+https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/retargeting_holosoma
+
+This branch should keep only the Triton humanoid retargeting contract, notes, and portable patch under [`../retargeting/`](../retargeting/). Local `holosoma-main/` copies, generated converter outputs, Python caches, downloaded datasets, and full robot asset trees should stay out of this branch. Use [`../retargeting/holosoma-source.md`](../retargeting/holosoma-source.md) as the entry point for working with the Holosoma branch.
 
 ## Internal Content
 

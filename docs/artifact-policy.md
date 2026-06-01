@@ -17,6 +17,7 @@ The main branch should remain usable as a project source and documentation repos
 ## Acceptable To Commit
 
 - small sample captures needed for tests or demos
+- small curated experiment outputs that document a tested contract
 - source code
 - setup documentation
 - small images used by reports

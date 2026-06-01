@@ -3,10 +3,14 @@
 ## Goal
 Build a real-time lower-body pose estimator for wearable IMUs.
 
+Source branch history:
+[`inverse-kinematics`](https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/inverse-kinematics).
+See [`source-branch.md`](source-branch.md) for the branch-to-folder mapping.
+
 The target hardware path is:
 
 ```text
-BNO085 quaternion streams on 7 ESP32-S3 nodes
+BNO085 quaternion streams on the active ESP32-S3 nodes
     -> direct Wi-Fi UDP to Jetson Nano
     -> sensor packet normalization
     -> neutral-pose and functional calibration
@@ -64,6 +68,10 @@ Segment IDs:
 6 right_foot
 255 unknown
 ```
+
+The software contract supports the full seven-segment lower-body set. The
+current hardware MVP can run with a five-node subset while still using the same
+packet format and segment IDs.
 
 ## Wearable Placement
 Default placement for the lower-body setup:
@@ -144,7 +152,8 @@ The next real work should happen in this order:
 
 ```text
 1. flash one ESP32-S3/BNO085 node and receive UDP packets on the Jetson
-2. flash all 7 nodes with unique sensor_id and segment_id settings
+2. flash the active 5-node MVP set, or all 7 nodes for the full lower-body set,
+   with unique sensor_id and segment_id settings
 3. tune quaternion spike filtering with real packet traces
 4. validate neutral standing calibration
 5. add thigh/shank heading alignment

@@ -25,6 +25,7 @@ Wearable IMUs / RGB-D camera
 | `retargeting/` | Triton humanoid retargeting contract, `ch_robot` joint order, and Holosoma patch notes. |
 | `simulation/` | Pointer to the dedicated Isaac Lab training repository and pinned simulation commit. |
 | `data/retargeting_samples/` | Small sample retargeting captures used for pipeline validation. |
+| `data/retargeting_experiments/` | Curated small experiment outputs that verify retargeting and conversion contracts. |
 | `docs/` | Project overview, architecture, setup notes, migration notes, and internal planning documents. |
 | `reports/` | CSE 145/237D reports, milestone material, presentations, and final deliverables. |
 | `media/` | Demo videos, screenshots, and images for the project page and final presentation. |
@@ -53,13 +54,14 @@ Each subsystem has its own setup notes:
 
 Triton Droids, UC San Diego.
 
-Primary project areas:
-
-- Embedded wearable sensing and Jetson communication
-- Human pose estimation and RGB-D baseline
-- Retargeting and inverse kinematics
-- Isaac Lab simulation, policy training, and sim-to-real preparation
-- Documentation, reports, and class deliverables
+| Name | Role | Focus |
+|---|---|---|
+| Darin Djapri | Team Lead | ML/RL, policy & reward design, IsaacLab simulation, sim-to-real |
+| Fong-Yu (Yang) Lin | ML Engineer | RL, policy & reward functions, Sim2Sim (IsaacLab → MuJoCo), data pipeline |
+| Cindy Chen | ML Engineer | Human pose extraction, 3D keypoint retargeting, Holosoma pipeline |
+| Parth Trivedi | Embedded Engineer | IMU + ESP32 hardware, Jetson integration, depth estimation baseline |
+| Neal Jian | Embedded Engineer | ESP32 firmware, UART/wireless pipeline, IK from quaternions, battery design |
+| Tauhid Malik | Embedded Engineer | IMU aggregation pipeline, Jetson networking, hardware bring-up |
 
 ## CSE 145/237D Materials
 

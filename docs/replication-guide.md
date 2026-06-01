@@ -4,7 +4,7 @@ This guide gives the high-level steps needed to reproduce the project.
 
 ## Hardware
 
-- 7 wearable IMU nodes using BNO085 orientation sensors and ESP32-S3 microcontrollers
+- 5 wearable IMU nodes using BNO085 orientation sensors and ESP32-S3 microcontrollers
 - Jetson Nano or equivalent robot-side computer
 - Triton humanoid robot model
 - Optional Intel RealSense D435 camera for the RGB-D baseline

@@ -8,7 +8,8 @@ Near-term target:
 BNO085 on each ESP32-S3
     -> fused quaternion report
     -> 40-byte UDP packet
-    -> direct Wi-Fi send to Jetson Nano
+    -> Wi-Fi UDP over the shared phone hotspot
+    -> laptop or other receiver on the same hotspot
     -> sensor/ normalization layer
 ```
 
@@ -27,50 +28,66 @@ Responsibilities:
 
 ## Network Architecture
 
-Use direct ESP32-S3 to Jetson UDP first:
+Use direct ESP32-S3 to receiver UDP over the phone hotspot first:
 
 ```text
 ESP32-S3 pelvis      \
 ESP32-S3 left thigh   \
 ESP32-S3 left shank    \
-ESP32-S3 left foot      -> Jetson UDP receiver
+ESP32-S3 left foot      -> laptop UDP receiver
 ESP32-S3 right thigh   /
 ESP32-S3 right shank  /
 ESP32-S3 right foot  /
 ```
 
-The pelvis ESP32-S3 is not the hub in the current design. Direct-to-Jetson keeps
-the first system easier to debug: one dropped sensor does not block the rest.
+The pelvis ESP32-S3 is not the hub in the current design. The phone hotspot only
+provides Wi-Fi connectivity; each ESP32 sends its own UDP packets to the
+receiver IP. The packet contract supports the full seven-segment layout shown
+above; the current MVP can also run a smaller active subset.
 
 ## ESP32 Firmware
 
-Board-only sanity check:
+The production firmware lives in `esp32_bno085_udp/`. The other `esp32s3_*`
+sketches in this folder (`esp32s3_led_sanity/`, `esp32s3_bno085_uart_sanity/`,
+`esp32s3_bno085_ble_sanity/`) are throwaway bring-up tests and are not part of
+the streaming path; this document covers only the UDP firmware.
 
-- `esp32s3_led_sanity/` cycles the ESP32-S3-DevKitC-1 v1.1 onboard RGB LED on
-  GPIO 38.
-- `esp32s3_bno085_uart_sanity/` verifies the ESP32-S3 can read BNO085
-  rotation-vector quaternions over full UART.
-- `esp32s3_bno085_ble_sanity/` is a no-Wi-Fi BLE test that advertises
-  quaternion text notifications.
+Use Arduino IDE and `.ino` for hardware bring-up. It is enough for this stage:
+we need reliable sensor reads, Wi-Fi, UDP packets, and fast iteration. If the
+firmware grows into shared drivers later, the packet contract should stay the
+same.
 
-Initial firmware lives in `esp32_bno085_udp/`.
+## Per-Board Configuration
 
-Use Arduino IDE and `.ino` for the first hardware bring-up. It is enough for
-this stage: we need reliable sensor reads, Wi-Fi, UDP packets, and fast
-iteration. If the firmware grows into shared drivers later, the packet contract
-should stay the same.
-
-Before flashing each ESP32, set:
+Each board needs a unique `sensor_id` and `segment_id`, plus the Wi-Fi
+credentials and receiver IP. These have compiled-in defaults but are stored in
+flash (NVS) and can be changed at runtime over the Serial Monitor at `115200`
+baud — no reflash needed. Send `help` to list the commands:
 
 ```text
-SENSOR_ID
-SEGMENT_ID
-JETSON_IP
-WIFI_SSID
-WIFI_PASSWORD
-BNO08X_TX_PIN
-BNO08X_RX_PIN
+ssid <name>      set Wi-Fi SSID          (reboot to apply)
+pass <password>  set Wi-Fi password      (reboot to apply)
+ip <a.b.c.d>     set UDP receiver IP     (applies live)
+port <n>         set UDP receiver port   (applies live)
+sensor <n>       set sensor id           (applies live)
+segment <n>      set segment id          (applies live)
+show             print current config
+clear            erase stored config, revert to compiled-in defaults
+reboot           restart the board
 ```
+
+Each set is saved to flash immediately. SSID/password changes need a `reboot`
+to reconnect; IP, port, sensor, and segment apply live. Saved values survive
+reflashing the firmware — only `clear` or a full flash erase resets them.
+
+The compiled-in defaults still live as `#define`s at the top of the sketch
+(`SENSOR_ID`, `SEGMENT_ID`, `RECEIVER_IP`, `RECEIVER_PORT`, `WIFI_SSID`,
+`WIFI_PASSWORD`, `BNO08X_TX_PIN`, `BNO08X_RX_PIN`, `BNO08X_UART_BAUD`).
+`RECEIVER_IP` is a dotted-decimal string, e.g. `"192.168.1.50"`. The pin and baud values
+are compile-time only; the rest are just the fallback used before anything is
+stored in flash. Copy `esp32_bno085_udp/secrets.example.h` to `secrets.h` to
+set Wi-Fi defaults locally without editing the sketch. `secrets.h` is ignored
+by Git.
 
 Segment IDs:
 
@@ -87,9 +104,6 @@ Segment IDs:
 
 The firmware sends 40-byte little-endian UDP packets with `IMUQ` magic and
 `wxyz` quaternion order. The matching parser lives in `sensor/packet.py`.
-
-Copy `esp32_bno085_udp/secrets.example.h` to `secrets.h` for local Wi-Fi and
-board-specific settings. `secrets.h` is ignored by Git.
 
 The UDP firmware prints Wi-Fi diagnostics over Serial Monitor at `115200`.
 During connection it will:
@@ -119,15 +133,16 @@ The password/security settings are probably wrong.
 Wi-Fi connected, but receiver is silent
 ```
 
-Check `JETSON_IP`, Windows Firewall, and that the laptop/Jetson receiver is
-listening on `0.0.0.0:5005`.
+Check `RECEIVER_IP`, macOS/Windows firewall rules, and that the laptop receiver
+is listening on `0.0.0.0:5005`. `RECEIVER_IP` is the laptop IP on the phone
+hotspot; set it over serial with `ip <a.b.c.d>` or as a compile-time default.
 
 ## UDP Timing Checks
 
 The ESP32 streams quaternion packets to:
 
 ```text
-JETSON_IP:JETSON_PORT
+RECEIVER_IP:RECEIVER_PORT
 ```
 
 and also listens for latency pings on:
@@ -139,14 +154,14 @@ ESP32_UDP_LOCAL_PORT
 Default ports:
 
 ```text
-JETSON_PORT = 5005
+RECEIVER_PORT = 5005
 ESP32_UDP_LOCAL_PORT = 5006
 ```
 
 Run the quaternion receiver:
 
 ```powershell
-conda run --no-capture-output -p .\.conda python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
+conda run --no-capture-output -n humanoid-sim python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
 ```
 
 The receiver reports:
@@ -158,11 +173,11 @@ The receiver reports:
 - `drops`: inferred sequence-number drops
 
 True one-way latency cannot be measured from `ESP32 micros()` alone because the
-ESP32 clock and laptop/Jetson clock are not synchronized. For a practical latency
+ESP32 clock and laptop clock are not synchronized. For a practical latency
 number, measure round-trip time:
 
 ```powershell
-conda run --no-capture-output -p .\.conda python demos\demo_udp_latency_ping.py 192.168.1.164 --port 5006
+conda run --no-capture-output -n humanoid-sim python demos\demo_udp_latency_ping.py 192.168.1.164 --port 5006
 ```
 
 Use the ESP32 IP printed by Serial Monitor.
