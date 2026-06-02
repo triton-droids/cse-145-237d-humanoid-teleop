@@ -124,8 +124,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--record-fps",
         type=float,
-        default=30.0,
-        help="Recording sample rate when the Record button is clicked.",
+        default=50.0,
+        help="Recording sample rate when the Record button is clicked "
+        "(sensors stream at 100 Hz, so up to ~100 is feasible).",
+    )
+    parser.add_argument(
+        "--draw-fps",
+        type=float,
+        default=10.0,
+        help="Max 3D redraw rate. Kept low so the loop prioritizes recording; "
+        "the live view is just a sanity check, not a smooth animation.",
     )
     parser.add_argument(
         "--record-output",
@@ -570,8 +578,10 @@ def main() -> None:
     # Recording and rendering run on independent cadences. The loop spins fast
     # so recording samples at its requested rate (limited only by how quickly
     # fresh packets arrive), while the expensive 3D redraw is throttled to
-    # ~draw_fps and never holds back capture.
-    draw_period = 1.0 / 20.0
+    # --draw-fps and never holds back capture. The draw rate is deliberately low
+    # (the view is a sanity check, not a smooth animation) so the loop spends
+    # its budget servicing the recorder.
+    draw_period = 1.0 / args.draw_fps if args.draw_fps > 0 else float("inf")
     last_draw = 0.0
     latest_skeleton = None  # most recent skeleton, reused by the throttled draw
 
@@ -589,9 +599,17 @@ def main() -> None:
             skeleton = aggregate_lower_body_skeleton(seg_orients)
             latest_skeleton = skeleton
 
-            # --- capture: runs every iteration, independent of the redraw ---
-            while state["recording"] and now >= state["record_next_sample_s"]:
-                state["record_next_sample_s"] += state["record_period_s"]
+            # --- capture: at most one fresh sample per iteration, independent
+            # of the redraw. Using a single `if` (not a catch-up `while`) avoids
+            # appending the same skeleton several times with identical
+            # timestamps if the loop briefly lags. The scheduled accumulator
+            # keeps average cadence; if we fall more than one period behind we
+            # re-anchor to `now` so we don't emit a burst of zero-gap frames.
+            if state["recording"] and now >= state["record_next_sample_s"]:
+                period = state["record_period_s"]
+                state["record_next_sample_s"] += period
+                if now - state["record_next_sample_s"] > period:
+                    state["record_next_sample_s"] = now + period
                 points_w = ml_joint_positions_w(skeleton)
                 if state["record_origin_w"] is None:
                     state["record_origin_w"] = pelvis_ground_origin_w(points_w)
@@ -623,12 +641,15 @@ def main() -> None:
                 )
                 if frame_count >= target_frames:
                     _finish_recording()
-                    break
         else:
-            # No fresh frame: a recording sample slot still elapses, count it as
-            # skipped so the timeline and progress stay honest.
-            while state["recording"] and now >= state["record_next_sample_s"]:
-                state["record_next_sample_s"] += state["record_period_s"]
+            # No fresh frame: the sample slot still elapses, count it as skipped
+            # so the timeline and progress stay honest (same single-slot, re-
+            # anchoring logic as the capture path).
+            if state["recording"] and now >= state["record_next_sample_s"]:
+                period = state["record_period_s"]
+                state["record_next_sample_s"] += period
+                if now - state["record_next_sample_s"] > period:
+                    state["record_next_sample_s"] = now + period
                 state["record_skipped"] += 1
                 state["record_message"] = (
                     f"recording {len(state['record_point_frames_w'])}/"

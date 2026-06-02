@@ -43,6 +43,44 @@ class OptionGroup:
 
 
 @dataclass(frozen=True)
+class Field:
+    """A free-text / numeric argument exposed as a labeled entry box.
+
+    Emits ``flag value`` only when the box is non-empty, so leaving it blank
+    falls back to the script's own default. An empty ``flag`` makes this a
+    positional argument (just the value, no flag).
+    """
+
+    key: str
+    label: str
+    flag: str
+    default: str = ""
+    placeholder: str = ""
+
+    def args_for(self, value: str) -> tuple[str, ...]:
+        value = value.strip()
+        if not value:
+            return ()
+        return (value,) if not self.flag else (self.flag, value)
+
+
+@dataclass(frozen=True)
+class Toggle:
+    """A boolean ``store_true`` flag exposed as a checkbox.
+
+    Emits the flag when checked, nothing when unchecked.
+    """
+
+    key: str
+    label: str
+    flag: str
+    default: bool = False
+
+    def args_for(self, checked: bool) -> tuple[str, ...]:
+        return (self.flag,) if checked else ()
+
+
+@dataclass(frozen=True)
 class DemoSpec:
     key: str
     title: str
@@ -52,6 +90,8 @@ class DemoSpec:
     notes: str = ""
     needs_args: bool = False
     options: tuple[OptionGroup, ...] = ()
+    fields: tuple[Field, ...] = ()
+    toggles: tuple[Toggle, ...] = ()
 
     def command(self, extra_args: tuple[str, ...] = ()) -> list[str]:
         return [sys.executable, "-u", str(self.script), *self.default_args, *extra_args]
@@ -102,10 +142,7 @@ DEMOS: tuple[DemoSpec, ...] = (
         title="Partial IMU Viewer + Recorder",
         script=PROJECT_ROOT / "demos" / "demo_partial_imu_live_viewer.py",
         description="Live lower-body skeleton from real IMU packets, with calibration and ML clip recording controls.",
-        notes=(
-            "Pick the IMU set on the right. Click Calibrate, then Record in the plot window. "
-            "Use Extra args for --record-duration-s, --record-fps, or --record-output."
-        ),
+        notes="Pick the IMU set on the right, set recording options below, then click Calibrate and Record in the plot window.",
         options=(
             OptionGroup(
                 key="config",
@@ -115,15 +152,27 @@ DEMOS: tuple[DemoSpec, ...] = (
                 default="thighs",
             ),
         ),
+        fields=(
+            Field("host", "Host", "--host", placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", placeholder="5005"),
+            Field("record_fps", "Record FPS", "--record-fps", placeholder="50"),
+            Field("draw_fps", "Draw FPS", "--draw-fps", placeholder="10"),
+            Field("record_duration_s", "Record seconds", "--record-duration-s", placeholder="10"),
+            Field("record_output", "Output .npz", "--record-output", placeholder="data/recordings/live_human_joint_clip.npz"),
+        ),
     ),
     DemoSpec(
         key="play-human-joint-clip",
         title="Play Human Joint Clip",
         script=PROJECT_ROOT / "demos" / "demo_play_human_joint_clip.py",
         description="Play back a recorded .npz joint clip as an animated 3D skeleton.",
-        notes=(
-            "Enter the clip path in Extra args, e.g. data/recordings/live_human_joint_clip.npz. "
-            "Add --origin to view pelvis-relative joints, or --speed 2 to play faster."
+        notes="Enter the clip path below. Origin shows pelvis-relative joints; Speed multiplies playback rate.",
+        fields=(
+            Field("clip", "Clip .npz", "", placeholder="data/recordings/live_human_joint_clip.npz"),
+            Field("speed", "Speed", "--speed", placeholder="1.0"),
+        ),
+        toggles=(
+            Toggle("origin", "Pelvis-relative (--origin)", "--origin"),
         ),
         needs_args=True,
     ),
@@ -133,13 +182,21 @@ DEMOS: tuple[DemoSpec, ...] = (
         script=PROJECT_ROOT / "demos" / "demo_udp_quaternion_receiver.py",
         description="Monitor live ESP32/BNO085 quaternion packet status over UDP.",
         notes="Requires ESP32/BNO085 nodes streaming UDP packets.",
+        fields=(
+            Field("host", "Host", "--host", placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", placeholder="5005"),
+        ),
     ),
     DemoSpec(
         key="udp-latency-ping",
         title="UDP Latency Ping",
         script=PROJECT_ROOT / "demos" / "demo_udp_latency_ping.py",
         description="Measure UDP round-trip latency to one ESP32 node.",
-        notes="Enter the ESP32 IP address in Extra args before running, for example: 192.168.4.20",
+        notes="Enter the ESP32 IP address (from Serial Monitor) below.",
+        fields=(
+            Field("esp32_ip", "ESP32 IP", "", placeholder="192.168.4.20"),
+            Field("port", "Port", "--port", placeholder="5006"),
+        ),
         needs_args=True,
     ),
 )
@@ -264,8 +321,15 @@ class DemoLauncher(tk.Tk):
         self.options_frame.grid(row=3, column=0, sticky="ew", pady=(14, 0))
         self.option_vars: dict[str, tk.StringVar] = {}
 
+        # Per-demo entry fields + checkboxes, also rebuilt on selection.
+        self.fields_frame = ttk.Frame(details, style="Panel.TFrame")
+        self.fields_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        self.field_vars: dict[str, tk.StringVar] = {}
+        self.toggle_vars: dict[str, tk.BooleanVar] = {}
+        self._placeholder_active: dict[str, bool] = {}
+
         args_frame = ttk.Frame(details, style="Panel.TFrame")
-        args_frame.grid(row=4, column=0, sticky="ew", pady=(14, 0))
+        args_frame.grid(row=5, column=0, sticky="ew", pady=(14, 0))
         args_frame.columnconfigure(1, weight=1)
         ttk.Label(args_frame, text="Extra args", style="Section.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 10))
         args_entry = ttk.Entry(args_frame, textvariable=self.extra_args)
@@ -273,7 +337,7 @@ class DemoLauncher(tk.Tk):
         args_entry.bind("<KeyRelease>", lambda _event: self._refresh_command_label())
 
         button_frame = ttk.Frame(details, style="Panel.TFrame")
-        button_frame.grid(row=5, column=0, sticky="ew", pady=(14, 0))
+        button_frame.grid(row=6, column=0, sticky="ew", pady=(14, 0))
         ttk.Button(button_frame, text="Run Demo", command=self._run_selected_demo, style="Primary.TButton").pack(side="left")
         ttk.Button(button_frame, text="Stop", command=self._stop_process, style="Danger.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Clear Output", command=self._clear_output, style="Secondary.TButton").pack(side="left", padx=(8, 0))
@@ -328,40 +392,111 @@ class DemoLauncher(tk.Tk):
         self._refresh_command_label()
 
     def _rebuild_options(self, demo: DemoSpec) -> None:
-        """Render the selected demo's option groups as segmented radio buttons."""
+        """Render the selected demo's option groups, fields, and toggles."""
+        # --- radio-button option groups ---
         for child in self.options_frame.winfo_children():
             child.destroy()
         self.option_vars = {}
-
         if not demo.options:
             self.options_frame.grid_remove()
-            return
-        self.options_frame.grid()
+        else:
+            self.options_frame.grid()
+            for row, group in enumerate(demo.options):
+                ttk.Label(self.options_frame, text=group.label, style="Section.TLabel").grid(
+                    row=row, column=0, sticky="w", padx=(0, 12), pady=(0, 4)
+                )
+                choices = ttk.Frame(self.options_frame, style="Panel.TFrame")
+                choices.grid(row=row, column=1, sticky="w", pady=(0, 4))
+                var = tk.StringVar(value=group.default)
+                self.option_vars[group.key] = var
+                for choice in group.choices:
+                    ttk.Radiobutton(
+                        choices,
+                        text=choice,
+                        value=choice,
+                        variable=var,
+                        style="Option.Toolbutton",
+                        command=self._refresh_command_label,
+                    ).pack(side="left", padx=(0, 6))
 
-        for row, group in enumerate(demo.options):
-            ttk.Label(self.options_frame, text=group.label, style="Section.TLabel").grid(
-                row=row, column=0, sticky="w", padx=(0, 12), pady=(0, 4)
+        # --- entry fields + checkboxes ---
+        for child in self.fields_frame.winfo_children():
+            child.destroy()
+        self.field_vars = {}
+        self.toggle_vars = {}
+        if not demo.fields and not demo.toggles:
+            self.fields_frame.grid_remove()
+            return
+        self.fields_frame.grid()
+        self.fields_frame.columnconfigure(1, weight=1)
+
+        row = 0
+        for field in demo.fields:
+            ttk.Label(self.fields_frame, text=field.label, style="Section.TLabel").grid(
+                row=row, column=0, sticky="w", padx=(0, 12), pady=3
             )
-            choices = ttk.Frame(self.options_frame, style="Panel.TFrame")
-            choices.grid(row=row, column=1, sticky="w", pady=(0, 4))
-            var = tk.StringVar(value=group.default)
-            self.option_vars[group.key] = var
-            for choice in group.choices:
-                ttk.Radiobutton(
-                    choices,
-                    text=choice,
-                    value=choice,
-                    variable=var,
-                    style="Option.Toolbutton",
+            var = tk.StringVar(value=field.default)
+            self.field_vars[field.key] = var
+            entry = ttk.Entry(self.fields_frame, textvariable=var)
+            entry.grid(row=row, column=1, sticky="ew", pady=3)
+            self._placeholder_active[field.key] = False
+            var.trace_add("write", lambda *_a: self._refresh_command_label())
+            if field.placeholder and not field.default:
+                self._add_placeholder(entry, field.key, var, field.placeholder)
+            row += 1
+
+        if demo.toggles:
+            toggles = ttk.Frame(self.fields_frame, style="Panel.TFrame")
+            toggles.grid(row=row, column=0, columnspan=2, sticky="w", pady=(4, 0))
+            for toggle in demo.toggles:
+                tvar = tk.BooleanVar(value=toggle.default)
+                self.toggle_vars[toggle.key] = tvar
+                ttk.Checkbutton(
+                    toggles,
+                    text=toggle.label,
+                    variable=tvar,
                     command=self._refresh_command_label,
-                ).pack(side="left", padx=(0, 6))
+                ).pack(side="left", padx=(0, 12))
+
+    def _add_placeholder(self, entry: ttk.Entry, key: str, var: tk.StringVar, text: str) -> None:
+        """Show greyed placeholder text while the field is empty and unfocused."""
+        def show() -> None:
+            if not var.get():
+                self._placeholder_active[key] = True
+                entry.configure(foreground="#9aa39b")
+                var.set(text)
+
+        def hide(_evt=None) -> None:
+            if self._placeholder_active.get(key):
+                self._placeholder_active[key] = False
+                entry.configure(foreground="#1f2421")
+                var.set("")
+
+        def restore(_evt=None) -> None:
+            if not var.get():
+                show()
+
+        entry.bind("<FocusIn>", hide)
+        entry.bind("<FocusOut>", restore)
+        show()
 
     def _option_args(self, demo: DemoSpec) -> tuple[str, ...]:
         args: list[str] = []
+        # Positional/value fields first (positionals must precede flags cleanly).
+        for field in demo.fields:
+            if self._placeholder_active.get(field.key):
+                continue  # showing placeholder text, treat as empty
+            var = self.field_vars.get(field.key)
+            if var is not None:
+                args.extend(field.args_for(var.get()))
         for group in demo.options:
             var = self.option_vars.get(group.key)
             if var is not None:
                 args.extend(group.args_for(var.get()))
+        for toggle in demo.toggles:
+            tvar = self.toggle_vars.get(toggle.key)
+            if tvar is not None:
+                args.extend(toggle.args_for(tvar.get()))
         return tuple(args)
 
     def _refresh_command_label(self) -> None:
@@ -395,11 +530,12 @@ class DemoLauncher(tk.Tk):
         except ValueError as exc:
             messagebox.showerror("Invalid extra args", str(exc))
             return
-        if demo.needs_args and not extra:
-            messagebox.showerror("Missing argument", f"{demo.title} needs extra args. {demo.notes}")
+        option_args = self._option_args(demo)
+        if demo.needs_args and not option_args and not extra:
+            messagebox.showerror("Missing argument", f"{demo.title} needs a value. {demo.notes}")
             return
 
-        command = demo.command(self._option_args(demo) + extra)
+        command = demo.command(option_args + extra)
         self.live_frame_buffer = None
         self._append_output(f"\n$ {' '.join(shlex.quote(part) for part in command)}\n", tag="command")
         try:
@@ -542,6 +678,12 @@ def main() -> None:
             for group in demo.options:
                 choices = "|".join(group.choices)
                 print(f"    {group.flag} {{{choices}}} (default: {group.default})")
+            for field in demo.fields:
+                name = field.flag or f"<{field.key}>"
+                hint = f" (e.g. {field.placeholder})" if field.placeholder else ""
+                print(f"    {name} VALUE{hint}")
+            for toggle in demo.toggles:
+                print(f"    {toggle.flag} (checkbox)")
         return
     DemoLauncher().mainloop()
 

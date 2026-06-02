@@ -94,7 +94,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=5005)
     parser.add_argument("--config", choices=list(PARTIAL_CONFIGS), default="shanks")
     parser.add_argument("--duration-s", type=float, default=10.0)
-    parser.add_argument("--fps", type=float, default=30.0)
+    parser.add_argument("--fps", type=float, default=50.0)
     parser.add_argument("--max-age-ms", type=float, default=150.0)
     parser.add_argument("--min-samples", type=int, default=20)
     parser.add_argument("--calibration-delay-s", type=float, default=1.0)

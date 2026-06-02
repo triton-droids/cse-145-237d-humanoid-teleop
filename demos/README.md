@@ -11,13 +11,22 @@ working. Core logic stays in the workflow folders (`sensor/`, `calibration/`,
 
 ## The launcher (easiest start)
 
-The launcher is a clickable control panel: pick a demo from the list, edit its
-arguments, and use Run/Stop. It starts each demo as a separate process and
-streams its output.
+The launcher is a clickable control panel: pick a demo from the list, set its
+arguments on the right, and use Run/Stop. It starts each demo as a separate
+process and streams its output.
+
+Each demo exposes its relevant arguments directly in the panel:
+
+- **Radio buttons** for fixed choices (e.g. the IMU set: thighs / shanks / full).
+- **Entry fields** for values like host, port, record FPS, draw FPS, record
+  duration, output path, or a clip path. Leaving a field on its greyed
+  placeholder uses the script's own default.
+- **Checkboxes** for on/off flags (e.g. `--origin` in the clip player).
+- An **Extra args** box is still there for anything not surfaced as a control.
 
 ```bash
 python demos/demo_launcher.py
-python demos/demo_launcher.py --list   # print demo keys, no GUI
+python demos/demo_launcher.py --list   # print demo keys + their controls, no GUI
 ```
 
 Or, with conda and without activating the env:
