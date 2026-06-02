@@ -198,6 +198,22 @@ python demos/demo_visualize_lower_body_model.py
 python demos/demo_mujoco_lower_body_viewer.py
 ```
 
+For recorded IMU/camera handoff data, the Holosoma `ch_robot` MuJoCo replay can
+use root translation from the recording so the robot moves across the floor
+instead of stepping in place:
+
+```bash
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+```
+
+Use `--base-motion fixed` for the older in-place behavior, or `root_xyz` if the
+source has usable vertical root motion.
+
+The direct ESP32 IMU live bridge is still orientation-only: it can retarget
+joint rotations live, but it needs a separate root-position source before it
+can translate the MuJoCo freejoint across the floor. The ZMQ mock-live path is
+the live-style path for recorded joint-position streams.
+
 ### With hardware (live ESP32-S3 / BNO085 over UDP)
 
 The ESP32 nodes and the receiver must be on the same Wi-Fi network (e.g. the

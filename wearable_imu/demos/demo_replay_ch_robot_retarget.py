@@ -50,6 +50,12 @@ def parse_args() -> argparse.Namespace:
         help="Position array to replay.",
     )
     parser.add_argument("--yaw-mode", choices=("keep", "strip"), default="keep")
+    parser.add_argument(
+        "--base-motion",
+        choices=("root_xy", "fixed", "root_xyz"),
+        default="root_xy",
+        help="How human root translation drives the ch_robot freejoint base.",
+    )
     parser.add_argument("--base-height", type=float, default=0.765)
     parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--no-show", action="store_true", help="Convert and print a summary without opening a window.")
@@ -78,6 +84,7 @@ def _print_summary(args: argparse.Namespace, points: np.ndarray, qpos: np.ndarra
     print(f"qpos       : {qpos.shape}")
     print(f"qvel       : {qvel.shape}")
     print(f"yaw mode   : {args.yaw_mode}")
+    print(f"base motion: {args.base_motion}")
     print("joint order: " + ", ".join(CH_ROBOT_JOINT_NAMES))
 
 
@@ -87,6 +94,7 @@ def main() -> None:
     qpos, qvel = human_joint_clip_to_qpos_qvel(
         clip,
         base_height=args.base_height,
+        base_motion=args.base_motion,
         yaw_mode=args.yaw_mode,
     )
     points = clip.joint_positions

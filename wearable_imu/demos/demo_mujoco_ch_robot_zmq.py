@@ -36,6 +36,7 @@ from ik.ch_robot_retarget import (  # noqa: E402
     CH_ROBOT_JOINT_NAMES,
     QPOS_WIDTH,
     QvelFiniteDifferencer,
+    base_position_from_joint_points,
     joint_positions_to_qpos,
 )
 from ik.zmq_human_joint_stream import (  # noqa: E402
@@ -51,6 +52,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_CACHE)
     parser.add_argument("--refresh-model", action="store_true")
     parser.add_argument("--yaw-mode", choices=("keep", "strip"), default="keep")
+    parser.add_argument(
+        "--base-motion",
+        choices=("root_xy", "fixed", "root_xyz"),
+        default="root_xy",
+        help="How human root translation drives the MuJoCo freejoint base.",
+    )
     parser.add_argument("--base-height", type=float, default=0.765)
     parser.add_argument("--poll-timeout-ms", type=int, default=100)
     parser.add_argument("--status-every", type=int, default=50)
@@ -95,14 +102,29 @@ def _recv_latest(socket, flags: int = 0):
     return decode_human_joint_frame(parts)
 
 
-def _frame_to_qpos(header: dict, points: np.ndarray, *, base_height: float, yaw_mode: str) -> np.ndarray:
+def _frame_to_qpos(
+    header: dict,
+    points: np.ndarray,
+    *,
+    base_height: float,
+    base_motion: str,
+    root_origin: np.ndarray,
+    yaw_mode: str,
+) -> np.ndarray:
     pelvis_orientation = None
     if "root_quat_wxyz" in header:
         pelvis_orientation = _rotation_from_wxyz(header["root_quat_wxyz"])
+    base_position = base_position_from_joint_points(
+        points,
+        root_origin=root_origin,
+        base_height=base_height,
+        base_motion=base_motion,
+    )
     return joint_positions_to_qpos(
         points,
         pelvis_orientation,
         base_height=base_height,
+        base_position=base_position,
         yaw_mode=yaw_mode,
     )
 
@@ -136,20 +158,31 @@ def main() -> None:
     print(f"  topic    : {HUMAN_JOINT_TOPIC.decode()}")
     print(f"  model    : {xml_path}")
     print(f"  nq/nu    : {model.nq}/{model.nu}")
+    print(f"  base     : {args.base_motion}")
     print("Waiting for frames...")
 
     qvel_diff = QvelFiniteDifferencer()
     received = 0
+    root_origin: np.ndarray | None = None
     last_qpos = np.zeros(QPOS_WIDTH, dtype=np.float64)
     last_qpos[:7] = [0.0, 0.0, args.base_height, 1.0, 0.0, 0.0, 0.0]
 
     def handle_available_frame() -> tuple[np.ndarray, np.ndarray] | None:
-        nonlocal received, last_qpos
+        nonlocal received, root_origin, last_qpos
         events = dict(poller.poll(args.poll_timeout_ms))
         if socket not in events:
             return None
         header, points = _recv_latest(socket)
-        qpos = _frame_to_qpos(header, points, base_height=args.base_height, yaw_mode=args.yaw_mode)
+        if root_origin is None:
+            root_origin = points[0].copy()
+        qpos = _frame_to_qpos(
+            header,
+            points,
+            base_height=args.base_height,
+            base_motion=args.base_motion,
+            root_origin=root_origin,
+            yaw_mode=args.yaw_mode,
+        )
         timestamp_s = float(header.get("timestamp_s", time.time()))
         qvel = qvel_diff.update(qpos, timestamp_s)
         received += 1

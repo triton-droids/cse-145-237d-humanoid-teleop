@@ -251,6 +251,13 @@ DEMOS: tuple[DemoSpec, ...] = (
                 choices=("keep", "strip"),
                 default="keep",
             ),
+            OptionGroup(
+                key="base_motion",
+                label="Base motion",
+                flag="--base-motion",
+                choices=("root_xy", "fixed", "root_xyz"),
+                default="root_xy",
+            ),
         ),
         fields=(
             Field("clip", "Clip path", "", placeholder="../data/smplh_capture_3.jsonl"),
@@ -282,6 +289,13 @@ DEMOS: tuple[DemoSpec, ...] = (
                 flag="--yaw-mode",
                 choices=("keep", "strip"),
                 default="keep",
+            ),
+            OptionGroup(
+                key="base_motion",
+                label="Base motion",
+                flag="--base-motion",
+                choices=("root_xy", "fixed", "root_xyz"),
+                default="root_xy",
             ),
         ),
         fields=(
@@ -333,6 +347,13 @@ DEMOS: tuple[DemoSpec, ...] = (
                 flag="--yaw-mode",
                 choices=("keep", "strip"),
                 default="keep",
+            ),
+            OptionGroup(
+                key="base_motion",
+                label="Base motion",
+                flag="--base-motion",
+                choices=("root_xy", "fixed", "root_xyz"),
+                default="root_xy",
             ),
         ),
         fields=(

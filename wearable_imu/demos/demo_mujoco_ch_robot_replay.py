@@ -59,6 +59,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--frame-key", choices=("joint_pos_origin", "joint_pos_w"), default="joint_pos_origin")
     parser.add_argument("--yaw-mode", choices=("keep", "strip"), default="keep")
+    parser.add_argument(
+        "--base-motion",
+        choices=("root_xy", "fixed", "root_xyz"),
+        default="root_xy",
+        help="How human root translation drives the MuJoCo freejoint base.",
+    )
     parser.add_argument("--base-height", type=float, default=0.765)
     parser.add_argument("--loop", action="store_true", default=True)
     parser.add_argument("--no-loop", dest="loop", action="store_false")
@@ -195,7 +201,14 @@ def _find_named(parent: ET.Element, tag: str, name: str) -> ET.Element | None:
     return None
 
 
-def load_replay_input(path: Path, *, frame_key: str, yaw_mode: str, base_height: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, str]:
+def load_replay_input(
+    path: Path,
+    *,
+    frame_key: str,
+    yaw_mode: str,
+    base_motion: str,
+    base_height: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, str]:
     if path.suffix == ".npz":
         data = np.load(path, allow_pickle=True)
     else:
@@ -217,6 +230,7 @@ def load_replay_input(path: Path, *, frame_key: str, yaw_mode: str, base_height:
     qpos, qvel = human_joint_clip_to_qpos_qvel(
         clip,
         base_height=base_height,
+        base_motion=base_motion,
         yaw_mode=yaw_mode,
     )
     return qpos, qvel, clip.timestamps_s, clip.fps, clip.frame_key
@@ -239,6 +253,7 @@ def print_summary(
     qpos: np.ndarray,
     qvel: np.ndarray,
     fps: float,
+    base_motion: str,
     model: mujoco.MjModel,
 ) -> None:
     print(f"Input      : {input_path}")
@@ -248,6 +263,7 @@ def print_summary(
     print(f"fps        : {fps:.1f}")
     print(f"qpos       : {qpos.shape}")
     print(f"qvel       : {qvel.shape}")
+    print(f"base motion: {base_motion}")
     print(f"MuJoCo nq  : {model.nq}")
     print(f"MuJoCo nu  : {model.nu}")
     print("joint order: " + ", ".join(CH_ROBOT_JOINT_NAMES))
@@ -261,6 +277,7 @@ def main() -> None:
         args.input,
         frame_key=args.frame_key,
         yaw_mode=args.yaw_mode,
+        base_motion=args.base_motion,
         base_height=args.base_height,
     )
 
@@ -278,6 +295,7 @@ def main() -> None:
         qpos=qpos,
         qvel=qvel,
         fps=fps,
+        base_motion=args.base_motion,
         model=model,
     )
     data.qpos[:] = qpos[0]

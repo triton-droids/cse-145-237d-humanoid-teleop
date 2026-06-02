@@ -28,6 +28,7 @@ from scipy.spatial.transform import Rotation
 Vector3 = NDArray[np.float64]
 Side = Literal["left", "right"]
 YawMode = Literal["keep", "strip"]
+BaseMotionMode = Literal["fixed", "root_xy", "root_xyz"]
 
 
 class LegPoseLike(Protocol):
@@ -174,6 +175,7 @@ def legposes_to_qpos(
     pelvis_orientation: Rotation | None = None,
     *,
     base_height: float = BASE_HEIGHT_M,
+    base_position: np.ndarray | None = None,
     yaw_mode: YawMode = "keep",
 ) -> np.ndarray:
     """Convert left/right ``LegPose`` rotations into a ch_robot qpos vector."""
@@ -181,7 +183,7 @@ def legposes_to_qpos(
     _require_sides(joint_rotations)
 
     qpos = np.zeros(QPOS_WIDTH, dtype=np.float64)
-    qpos[:3] = np.array([0.0, 0.0, base_height], dtype=np.float64)
+    qpos[:3] = _base_qpos_position(base_height=base_height, base_position=base_position)
     qpos[3:7] = _wxyz_quat(
         _base_orientation_to_robot_frame(
             pelvis_orientation or Rotation.identity(),
@@ -278,6 +280,7 @@ def joint_positions_to_qpos(
     pelvis_orientation: Rotation | None = None,
     *,
     base_height: float = BASE_HEIGHT_M,
+    base_position: np.ndarray | None = None,
     yaw_mode: YawMode = "keep",
 ) -> np.ndarray:
     """Convert one recorded 9-joint IMU handoff frame to ch_robot qpos."""
@@ -287,6 +290,7 @@ def joint_positions_to_qpos(
         legposes,
         pelvis_orientation,
         base_height=base_height,
+        base_position=base_position,
         yaw_mode=yaw_mode,
     )
 
@@ -411,6 +415,7 @@ def human_joint_clip_to_qpos_qvel(
     clip: HumanJointClip,
     *,
     base_height: float = BASE_HEIGHT_M,
+    base_motion: BaseMotionMode = "fixed",
     yaw_mode: YawMode = "keep",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Convert a recorded IMU handoff clip to ``(qpos, qvel)`` arrays."""
@@ -418,6 +423,7 @@ def human_joint_clip_to_qpos_qvel(
     qpos_frames: list[np.ndarray] = []
     qvel_frames: list[np.ndarray] = []
     differencer = QvelFiniteDifferencer()
+    root_origin = clip.joint_positions[0, SPINE1_IDX].copy()
 
     for frame_index, points in enumerate(clip.joint_positions):
         pelvis_orientation = (
@@ -425,10 +431,17 @@ def human_joint_clip_to_qpos_qvel(
             if clip.root_quat_wxyz is None
             else _rotation_from_wxyz(clip.root_quat_wxyz[frame_index])
         )
+        base_position = base_position_from_joint_points(
+            points,
+            root_origin=root_origin,
+            base_height=base_height,
+            base_motion=base_motion,
+        )
         qpos = joint_positions_to_qpos(
             points,
             pelvis_orientation,
             base_height=base_height,
+            base_position=base_position,
             yaw_mode=yaw_mode,
         )
         qvel = differencer.update(qpos, float(clip.timestamps_s[frame_index]))
@@ -438,12 +451,55 @@ def human_joint_clip_to_qpos_qvel(
     return np.stack(qpos_frames), np.stack(qvel_frames)
 
 
+def base_position_from_joint_points(
+    joint_positions: np.ndarray,
+    *,
+    root_origin: np.ndarray,
+    base_height: float = BASE_HEIGHT_M,
+    base_motion: BaseMotionMode = "fixed",
+) -> np.ndarray | None:
+    """Return freejoint base position from a 9-joint frame and a root origin."""
+
+    if base_motion == "fixed":
+        return None
+
+    points = np.asarray(joint_positions, dtype=np.float64)
+    origin = np.asarray(root_origin, dtype=np.float64)
+    if points.shape != (len(HUMAN_JOINT_NAMES), 3):
+        raise ValueError(
+            f"joint_positions must have shape ({len(HUMAN_JOINT_NAMES)}, 3), got {points.shape}"
+        )
+    if origin.shape != (3,):
+        raise ValueError(f"root_origin must have shape (3,), got {origin.shape}")
+
+    root_delta = HUMAN_TO_ROBOT_FRAME.apply(points[SPINE1_IDX] - origin)
+    if base_motion == "root_xy":
+        return np.array([root_delta[0], root_delta[1], base_height], dtype=np.float64)
+    if base_motion == "root_xyz":
+        return np.array(
+            [root_delta[0], root_delta[1], base_height + root_delta[2]],
+            dtype=np.float64,
+        )
+    raise ValueError(f"unknown base_motion: {base_motion!r}")
+
+
 def _camera_world_to_human_frame(point_xyz: object) -> np.ndarray:
     camera = np.asarray(point_xyz, dtype=np.float64)
     if camera.shape != (3,) or not np.all(np.isfinite(camera)):
         raise ValueError(f"camera joint point must have shape (3,), got {camera.shape}")
     x_right, y_forward, z_up = camera
     return np.array([-y_forward, x_right, z_up], dtype=np.float64)
+
+
+def _base_qpos_position(*, base_height: float, base_position: np.ndarray | None) -> np.ndarray:
+    if base_position is None:
+        return np.array([0.0, 0.0, base_height], dtype=np.float64)
+    position = np.asarray(base_position, dtype=np.float64)
+    if position.shape != (3,):
+        raise ValueError(f"base_position must have shape (3,), got {position.shape}")
+    position = position.copy()
+    position[np.abs(position) < 1e-15] = 0.0
+    return position
 
 
 def _fps_from_timestamps(timestamps_s: np.ndarray) -> float:

@@ -19,6 +19,7 @@ from ik.ch_robot_retarget import (
     QVEL_WIDTH,
     QvelFiniteDifferencer,
     HumanJointClip,
+    base_position_from_joint_points,
     human_joint_clip_to_qpos_qvel,
     joint_positions_to_legposes,
     joint_positions_to_qpos,
@@ -188,6 +189,34 @@ def test_human_joint_clip_to_qpos_qvel_converts_recorded_imu_handoff_shape() -> 
     assert qvel.shape == (2, QVEL_WIDTH)
     np.testing.assert_allclose(qvel[0], np.zeros(QVEL_WIDTH))
     assert np.any(np.abs(qpos[1, FLOATING_BASE_QPOS_DIMS:]) > 0.0)
+
+
+def test_root_xy_base_motion_drives_freejoint_translation_and_velocity() -> None:
+    points = np.stack([_neutral_joint_positions(), _neutral_joint_positions()])
+    points[1] += np.array([0.12, -0.04, 0.03], dtype=np.float64)
+    clip = HumanJointClip(
+        joint_positions=points,
+        root_quat_wxyz=None,
+        timestamps_s=np.array([0.0, 0.02]),
+        fps=50.0,
+        joint_names=HUMAN_JOINT_NAMES,
+        frame_key="joint_pos_origin",
+    )
+
+    qpos, qvel = human_joint_clip_to_qpos_qvel(clip, base_motion="root_xy")
+
+    np.testing.assert_allclose(qpos[0, :3], [0.0, 0.0, BASE_HEIGHT_M])
+    np.testing.assert_allclose(qpos[1, :3], [0.04, 0.12, BASE_HEIGHT_M])
+    np.testing.assert_allclose(qvel[0, :3], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(qvel[1, :3], [2.0, 6.0, 0.0])
+    np.testing.assert_allclose(
+        base_position_from_joint_points(
+            points[1],
+            root_origin=points[0, 0],
+            base_motion="root_xyz",
+        ),
+        [0.04, 0.12, BASE_HEIGHT_M + 0.03],
+    )
 
 
 def test_load_actual_recorded_clip_if_available() -> None:
