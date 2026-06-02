@@ -71,6 +71,9 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 | Script | What it does | Key flags |
 |---|---|---|
 | `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). Includes Calibrate, Clear calibration, Record, and Stop rec buttons. In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--record-duration-s`, `--record-fps`, `--record-output` |
+| `demo_live_retarget.py` | Headless live Plan A bridge: IMU packets -> calibrated lower-body skeleton -> ch_robot `qpos[17]` and `qvel[16]`, emitted as JSON lines over stdout or UDP. | `--config {thighs,shanks,full}`, `--output {stdout,udp,none}`, `--target-host`, `--target-port`, `--fps`, `--yaw-mode {keep,strip}` |
+| `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` IMU handoff clip through Plan A, visualize the skeleton, and show the resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--no-show` |
+| `demo_mujoco_ch_robot_replay.py` | Replay a recorded IMU handoff clip or saved ch_robot qpos replay on the real Holosoma `ch_robot_10dof.xml` MuJoCo model. Auto-extracts XML/meshes from `retargeting_holosoma` into `.cache/`. | positional `input`, `--speed`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--no-show`, `--refresh-model` |
 | `demo_record_human_joint_clip.py` | Offline recorder that saves ML retargeting joint positions (`Spine1`, hips, knees, ankles, and generated toe points) to `.npz`. | `--config {thighs,shanks,full}`, `--duration-s`, `--fps`, `--output` |
 | `demo_udp_quaternion_receiver.py` | Text-only packet monitor: per-segment rate, age, receive/sensor jitter, drops, raw quaternions. | `--host`, `--port`, `--max-age-ms` |
 | `demo_udp_latency_ping.py` | Round-trip UDP latency test to one node. | positional `esp32_ip`, `--port`, `--count`, `--interval-ms`, `--timeout-ms` |
@@ -86,6 +89,21 @@ python demos/demo_partial_imu_live_viewer.py --config shanks --record-duration-s
 
 # Headless-style offline recorder without the live viewer
 python demos/demo_record_human_joint_clip.py --config shanks --duration-s 10 --fps 30 --output data/recordings/example_walk.npz
+
+# Live ch_robot qpos/qvel JSON lines for a downstream policy process
+python demos/demo_live_retarget.py --config shanks --output stdout --fps 100
+
+# Live ch_robot qpos/qvel over UDP
+python demos/demo_live_retarget.py --config full --output udp --target-host 127.0.0.1 --target-port 6010
+
+# Replay a recorded IMU handoff clip through ch_robot retargeting with visualization
+python demos/demo_replay_ch_robot_retarget.py ../data/human_joint_clip_20260601_231345.npz
+
+# Run the recorded IMU handoff on the actual ch_robot MuJoCo model from retargeting_holosoma
+python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz
+
+# Or run a saved qpos/qvel replay on the actual ch_robot MuJoCo model
+python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_20260601_231345.npz
 
 # Check packets are arriving before launching the viewer
 python demos/demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
