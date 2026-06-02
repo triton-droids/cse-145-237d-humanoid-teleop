@@ -70,3 +70,13 @@ Course-facing deliverables are collected under [`reports/`](reports/):
 - Milestone report: [`reports/milestone_report.md`](reports/milestone_report.md)
 - Presentations: [`reports/presentations/`](reports/presentations/)
 - Demo media: [`media/`](media/)
+
+## Source Mapping
+
+| Source                        | Destination                      | Notes                                                                                    |
+| ----------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `origin/inverse-kinematics`   | `wearable_imu/`                  | Real-world IMU packet, calibration, IK, demo, and test code.                             |
+| `origin/depthCamera`          | `perception/depth_camera/`       | RealSense D435 + MediaPipe pose-estimation baseline.                                     |
+| `origin/retargeting_data`     | `data/retargeting_samples/`      | Small sample JSONL captures.                                                             |
+| `origin/retargeting_holosoma` | `retargeting/`                   | Project-specific CH robot retargeting notes and Holosoma converter patch only.           |
+| `triton-droids/simulation`    | `simulation/README.md` link only | Current Isaac Lab humanoid simulation code stays in the dedicated simulation repository. |
