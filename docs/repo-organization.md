@@ -22,7 +22,7 @@ Our public-facing material explains what the project is, how the pipeline works,
 We keep these files clean enough to make the repository public:
 
 - `README.md`
-- `docs/project-overview-zh.md`
+- `docs/project-overview.md`
 - `docs/replication-guide.md`
 - `docs/system-architecture.md`
 - `retargeting/README.md`
