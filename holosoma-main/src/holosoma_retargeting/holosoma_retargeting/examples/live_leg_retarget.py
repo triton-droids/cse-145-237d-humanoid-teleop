@@ -263,10 +263,14 @@ class LiveLegRetargeter:
         )
         kwargs = build_retargeter_kwargs_from_config(retargeter_config, self.constants, object_urdf_path, "robot_only")
         self.retargeter = InteractionMeshRetargeter(**kwargs)
+        self.default_q = np.asarray(self.retargeter.robot_model.qpos0, dtype=float).copy()
+        self.current_command_q = self.default_q.copy()
         self.q: np.ndarray | None = None
         self.q_last: np.ndarray | None = None
         self.frame_idx = 0
         self.qpos_history: list[np.ndarray] = []
+        if self.cfg.visualize:
+            self.retargeter.draw_q(self.current_command_q)
 
     def _initial_q(self, frame: np.ndarray) -> np.ndarray:
         q_joints = np.asarray(self.constants.Q_INIT_JOINTS, dtype=float)
@@ -306,11 +310,18 @@ class LiveLegRetargeter:
         )
         self.q_last = self.q
         self.q = q_solved
+        self.current_command_q = q_solved.copy()
         self.frame_idx += 1
         self.qpos_history.append(q_solved.copy())
         if self.cfg.visualize:
             self.retargeter.draw_q(q_solved)
         return q_solved, float(cost)
+
+    def hold_current_command(self) -> np.ndarray:
+        """Reuse the latest solved command, or the MJCF default before input arrives."""
+        if self.cfg.visualize:
+            self.retargeter.draw_q(self.current_command_q)
+        return self.current_command_q.copy()
 
 
 class ZmqFrameReceiver:
@@ -372,6 +383,7 @@ def run_zmq(cfg: LiveLegRetargetConfig) -> list[np.ndarray]:
         while True:
             decoded = receiver.recv_latest(cfg.poll_timeout_ms)
             if decoded is None:
+                live_rt.hold_current_command()
                 continue
             frame_idx, timestamp, frame = decoded
             q, cost = live_rt.solve_frame(canonicalizer.apply(frame))
