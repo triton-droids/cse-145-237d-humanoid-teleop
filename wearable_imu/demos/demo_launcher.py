@@ -309,6 +309,47 @@ DEMOS: tuple[DemoSpec, ...] = (
         needs_args=True,
     ),
     DemoSpec(
+        key="compare-human-ch-robot",
+        title="Compare Human + ch_robot",
+        script=PROJECT_ROOT / "demos" / "demo_compare_human_clip_ch_robot.py",
+        description="Open the raw human .npz skeleton player and retargeted ch_robot MuJoCo replay together.",
+        notes="Use a recorded human_joint_clip .npz. Closing either window stops both child demos.",
+        options=(
+            OptionGroup(
+                key="frame_key",
+                label="Frame key",
+                flag="--frame-key",
+                choices=("joint_pos_origin", "joint_pos_w"),
+                default="joint_pos_origin",
+            ),
+            OptionGroup(
+                key="yaw_mode",
+                label="Base yaw",
+                flag="--yaw-mode",
+                choices=("keep", "strip"),
+                default="keep",
+            ),
+            OptionGroup(
+                key="base_motion",
+                label="Base motion",
+                flag="--base-motion",
+                choices=("root_xy", "fixed", "root_xyz"),
+                default="root_xy",
+            ),
+        ),
+        fields=(
+            Field("clip", "Clip .npz", "", placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("speed", "Speed", "--speed", placeholder="1.0"),
+        ),
+        toggles=(
+            Toggle("human_origin", "Human pelvis-relative", "--human-origin"),
+            Toggle("no_show", "No window", "--no-show"),
+            Toggle("refresh_model", "Refresh model", "--refresh-model"),
+            Toggle("no_loop", "No robot loop", "--no-loop"),
+        ),
+        needs_args=True,
+    ),
+    DemoSpec(
         key="zmq-human-joint-publisher",
         title="ZMQ Human Joint Publisher",
         script=PROJECT_ROOT / "demos" / "demo_zmq_human_joint_publisher.py",

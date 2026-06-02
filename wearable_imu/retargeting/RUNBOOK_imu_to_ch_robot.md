@@ -221,7 +221,50 @@ demo_replay_ch_robot_retarget.py   : inspect human skeleton plus retargeted ch_r
 demo_mujoco_ch_robot_replay.py     : inspect the retargeted motion on the ch_robot MuJoCo model
 ```
 
-## 8. Matplotlib Retargeting Debug View
+## 8. Side-by-Side Human Clip and MuJoCo Robot
+
+Use this when you want to see the before-retargeted human skeleton and the
+after-retargeted ch_robot MuJoCo robot at the same time. The wrapper starts
+both child demos and stops both when either window closes.
+
+Basic before/after comparison:
+
+```bash
+python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+```
+
+Show the human skeleton in pelvis-origin coordinates while the robot uses
+`root_xy` base motion:
+
+```bash
+python demos/demo_compare_human_clip_ch_robot.py \
+  ../data/human_joint_clip_20260601_231345.npz \
+  --human-origin \
+  --base-motion root_xy
+```
+
+Slow down or speed up both windows together:
+
+```bash
+python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 0.5
+python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 2.0
+```
+
+No-window smoke test for the combined command:
+
+```bash
+python demos/demo_compare_human_clip_ch_robot.py \
+  ../data/human_joint_clip_20260601_231345.npz \
+  --base-motion root_xy \
+  --no-show
+```
+
+This wrapper only accepts recorded human `.npz` clips. It does not accept
+camera `.jsonl` captures because the raw human clip player only reads `.npz`.
+For camera `.jsonl`, use the standalone MuJoCo replay or the Matplotlib
+retargeting debug view.
+
+## 9. Matplotlib Retargeting Debug View
 
 This path does not open MuJoCo. It visualizes the human skeleton and shows the
 resulting ch_robot joint angles.
@@ -259,7 +302,7 @@ Replay the saved `qpos`/`qvel` in MuJoCo:
 python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_smplh_capture_3.npz
 ```
 
-## 9. 50 Hz ZMQ Mock-Live: Camera JSONL
+## 10. 50 Hz ZMQ Mock-Live: Camera JSONL
 
 This is the closest recorded-data path to live operation. The publisher sends
 each 9-joint position frame at 50 Hz. The subscriber retargets every incoming
@@ -317,7 +360,7 @@ received=10 frame=9
 Converted 10 ZMQ frames.
 ```
 
-## 10. 50 Hz ZMQ Mock-Live: Recorded IMU NPZ
+## 11. 50 Hz ZMQ Mock-Live: Recorded IMU NPZ
 
 Terminal 1:
 
@@ -334,7 +377,7 @@ python demos/demo_zmq_human_joint_publisher.py \
   --fps 50
 ```
 
-## 11. Real IMU Live Retargeting
+## 12. Real IMU Live Retargeting
 
 The real ESP32/BNO085 IMU live path is currently orientation-only. It can emit
 live joint rotations retargeted into ch_robot `qpos`/`qvel`, but it does not
@@ -380,7 +423,7 @@ root_position_source -> base_position_from_joint_points(...) or equivalent
 -> legposes_to_qpos(..., base_position=...)
 ```
 
-## 12. Demo Launcher
+## 13. Demo Launcher
 
 Open the GUI launcher:
 
@@ -393,6 +436,7 @@ Common launcher entries:
 ```text
 Replay ch_robot Retarget  : Matplotlib skeleton + joint-angle debug
 MuJoCo ch_robot Replay    : offline MuJoCo replay
+Compare Human + ch_robot  : raw human .npz skeleton and MuJoCo robot together
 ZMQ Human Joint Publisher : mock-live publisher
 MuJoCo ch_robot ZMQ       : mock-live subscriber + MuJoCo viewer
 Live ch_robot Retarget    : real ESP32 IMU orientation-only bridge
@@ -406,7 +450,7 @@ For replay, MuJoCo replay, and ZMQ subscriber entries, the launcher exposes a
 root_xy, fixed, root_xyz
 ```
 
-## 13. Model Cache and Floor
+## 14. Model Cache and Floor
 
 `demo_mujoco_ch_robot_replay.py` and `demo_mujoco_ch_robot_zmq.py` extract the
 ch_robot MJCF and meshes from `origin/retargeting_holosoma` into:
@@ -428,7 +472,7 @@ the cached XML:
 python -c "from pathlib import Path; print(Path('.cache/ch_robot_model/ch_robot_10dof.xml').read_text()[:1000])"
 ```
 
-## 14. Validation Commands
+## 15. Validation Commands
 
 Syntax check:
 
@@ -484,7 +528,7 @@ python demos/demo_zmq_human_joint_publisher.py \
   --status-every 1
 ```
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 ### `launch_passive requires mjpython`
 
@@ -569,7 +613,7 @@ python -m pytest tests/test_ch_robot_retarget.py -q
 Do not run `wearable_imu/tests/...` directly from the repo root unless you set
 `PYTHONPATH` manually.
 
-## 16. Recommended Workflow
+## 17. Recommended Workflow
 
 At the start of a session:
 
@@ -587,6 +631,12 @@ If the no-window check passes, open visualization:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+```
+
+To compare raw human `.npz` skeleton and retargeted robot together:
+
+```bash
+python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
 ```
 
 To test the live-like pipeline:
