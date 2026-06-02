@@ -37,6 +37,18 @@ LAFAN_DEMO_JOINTS = [
     "LeftHand",
 ]
 
+LIVE_LEG_DEMO_JOINTS = [
+    "Spine1",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase",
+]
+
 SMPLH_DEMO_JOINTS = [
     "Pelvis",
     "L_Hip",
@@ -220,6 +232,17 @@ JOINTS_MAPPINGS = {
         "LeftToeBase": "right_foot_sphere_3_link",
         "RightToeBase": "left_foot_sphere_3_link",
     },
+    ("live_legs", "ch_robot"): {
+        "Spine1": "pelvis_marker",
+        "LeftUpLeg": "right_hip_marker",
+        "LeftLeg": "right_knee_marker",
+        "LeftFoot": "right_ankle_marker",
+        "LeftToeBase": "right_foot_sphere_3_link",
+        "RightUpLeg": "left_hip_marker",
+        "RightLeg": "left_knee_marker",
+        "RightFoot": "left_ankle_marker",
+        "RightToeBase": "left_foot_sphere_3_link",
+    },
     ("smplh", "g1"): {
         "Pelvis": "pelvis_contour_link",
         "L_Hip": "left_hip_pitch_link",
@@ -337,6 +360,7 @@ JOINTS_MAPPINGS = {
 # Data format specific constants
 TOE_NAMES_BY_FORMAT = {
     "lafan": ["LeftToeBase", "RightToeBase"],
+    "live_legs": ["LeftToeBase", "RightToeBase"],
     "smplh": ["L_Toe", "R_Toe"],
     "mocap": ["LeftToeBase", "RightToeBase"],
     "smplx": ["L_Foot", "R_Foot"],
@@ -363,6 +387,7 @@ DATA_FORMAT_CONSTANTS: dict[str, FormatConstants] = {
 # No need to update any Literal types - DataFormat is now str with runtime validation
 DEMO_JOINTS_REGISTRY: dict[str, list[str]] = {
     "lafan": LAFAN_DEMO_JOINTS,
+    "live_legs": LIVE_LEG_DEMO_JOINTS,
     "smplh": SMPLH_DEMO_JOINTS,
     "mocap": MOCAP_DEMO_JOINTS,
     "smplx": SMPLX_DEMO_JOINTS,
