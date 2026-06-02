@@ -25,6 +25,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
@@ -46,6 +47,8 @@ from ik.ch_robot_retarget import (  # noqa: E402
 BRANCH_REF = "origin/retargeting_holosoma"
 CH_ROBOT_BRANCH_PATH = "holosoma-main/src/holosoma_retargeting/holosoma_retargeting/models/ch_robot"
 DEFAULT_MODEL_CACHE = PROJECT_ROOT / ".cache" / "ch_robot_model"
+FLOOR_TEXTURE_NAME = "floor_grid_texture"
+FLOOR_MATERIAL_NAME = "floor_grid"
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,6 +95,7 @@ def ensure_ch_robot_model(model_dir: Path, *, refresh: bool = False) -> Path:
     xml_path = model_dir / "ch_robot_10dof.xml"
     mesh_dir = model_dir / "meshes"
     if not refresh and xml_path.exists() and mesh_dir.exists():
+        ensure_visible_floor(xml_path)
         return xml_path
 
     if refresh and model_dir.exists():
@@ -119,7 +123,76 @@ def ensure_ch_robot_model(model_dir: Path, *, refresh: bool = False) -> Path:
 
     if not xml_path.exists():
         raise RuntimeError(f"missing ch_robot MJCF after extraction: {xml_path}")
+    ensure_visible_floor(xml_path)
     return xml_path
+
+
+def ensure_visible_floor(xml_path: Path) -> None:
+    """Ensure the cached ch_robot MJCF has a visible checker floor plane."""
+
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    asset = root.find("asset")
+    if asset is None:
+        asset = ET.Element("asset")
+        worldbody = root.find("worldbody")
+        insert_index = list(root).index(worldbody) if worldbody is not None else len(root)
+        root.insert(insert_index, asset)
+
+    texture = _find_named(asset, "texture", FLOOR_TEXTURE_NAME)
+    if texture is None:
+        texture = ET.SubElement(asset, "texture")
+    texture.attrib.update(
+        {
+            "name": FLOOR_TEXTURE_NAME,
+            "type": "2d",
+            "builtin": "checker",
+            "rgb1": "0.18 0.20 0.22",
+            "rgb2": "0.32 0.34 0.36",
+            "width": "512",
+            "height": "512",
+        }
+    )
+
+    material = _find_named(asset, "material", FLOOR_MATERIAL_NAME)
+    if material is None:
+        material = ET.SubElement(asset, "material")
+    material.attrib.update(
+        {
+            "name": FLOOR_MATERIAL_NAME,
+            "texture": FLOOR_TEXTURE_NAME,
+            "texrepeat": "8 8",
+            "reflectance": "0.12",
+        }
+    )
+
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        worldbody = ET.SubElement(root, "worldbody")
+
+    ground = _find_named(worldbody, "geom", "ground")
+    if ground is None:
+        ground = ET.SubElement(worldbody, "geom")
+    ground.attrib.update(
+        {
+            "name": "ground",
+            "type": "plane",
+            "size": "10 10 0.1",
+            "pos": "0 0 0",
+            "material": FLOOR_MATERIAL_NAME,
+        }
+    )
+
+    ET.indent(tree, space="  ")
+    tree.write(xml_path, encoding="utf-8", xml_declaration=False)
+
+
+def _find_named(parent: ET.Element, tag: str, name: str) -> ET.Element | None:
+    for child in parent.findall(tag):
+        if child.attrib.get("name") == name:
+            return child
+    return None
 
 
 def load_replay_input(path: Path, *, frame_key: str, yaw_mode: str, base_height: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, str]:

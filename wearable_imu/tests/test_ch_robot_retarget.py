@@ -35,6 +35,11 @@ from ik.zmq_human_joint_stream import (
     encode_human_joint_frame,
 )
 from model.lower_body import LegPose
+from demos.demo_mujoco_ch_robot_replay import (
+    FLOOR_MATERIAL_NAME,
+    FLOOR_TEXTURE_NAME,
+    ensure_visible_floor,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -218,6 +223,25 @@ def test_zmq_human_joint_frame_roundtrip() -> None:
     assert header["fps"] == pytest.approx(50.0)
     assert header["root_quat_wxyz"] == [1.0, 0.0, 0.0, 0.0]
     np.testing.assert_allclose(decoded, points)
+
+
+def test_ensure_visible_floor_adds_checker_plane(tmp_path: Path) -> None:
+    xml_path = tmp_path / "model.xml"
+    xml_path.write_text("<mujoco model=\"tiny\"><worldbody/></mujoco>", encoding="utf-8")
+
+    ensure_visible_floor(xml_path)
+    root = ET.parse(xml_path).getroot()
+    texture = root.find(f".//texture[@name='{FLOOR_TEXTURE_NAME}']")
+    material = root.find(f".//material[@name='{FLOOR_MATERIAL_NAME}']")
+    ground = root.find(".//geom[@name='ground']")
+
+    assert texture is not None
+    assert texture.attrib["builtin"] == "checker"
+    assert material is not None
+    assert material.attrib["texture"] == FLOOR_TEXTURE_NAME
+    assert ground is not None
+    assert ground.attrib["type"] == "plane"
+    assert ground.attrib["material"] == FLOOR_MATERIAL_NAME
 
 
 def test_retargeted_qpos_matches_repo_root_contract_validator() -> None:
