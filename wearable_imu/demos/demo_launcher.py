@@ -295,6 +295,56 @@ DEMOS: tuple[DemoSpec, ...] = (
         needs_args=True,
     ),
     DemoSpec(
+        key="zmq-human-joint-publisher",
+        title="ZMQ Human Joint Publisher",
+        script=PROJECT_ROOT / "demos" / "demo_zmq_human_joint_publisher.py",
+        description="Publish a recorded human_joint_clip .npz as mock-live 9-joint frames over ZeroMQ.",
+        notes="Run this first, then run the MuJoCo ZMQ subscriber.",
+        options=(
+            OptionGroup(
+                key="frame_key",
+                label="Frame key",
+                flag="--frame-key",
+                choices=("joint_pos_origin", "joint_pos_w"),
+                default="joint_pos_origin",
+            ),
+        ),
+        fields=(
+            Field("clip", "Clip .npz", "", placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("endpoint", "Endpoint", "--endpoint", placeholder="tcp://127.0.0.1:5556"),
+            Field("fps", "Publish FPS", "--fps", placeholder="50"),
+            Field("max_frames", "Max frames", "--max-frames", placeholder="0"),
+        ),
+        toggles=(
+            Toggle("no_loop", "No loop", "--no-loop"),
+        ),
+        needs_args=True,
+    ),
+    DemoSpec(
+        key="mujoco-ch-robot-zmq",
+        title="MuJoCo ch_robot ZMQ",
+        script=PROJECT_ROOT / "demos" / "demo_mujoco_ch_robot_zmq.py",
+        description="Subscribe to mock-live ZMQ human joints and drive the real ch_robot MuJoCo model online.",
+        notes="Start the ZMQ Human Joint Publisher first.",
+        options=(
+            OptionGroup(
+                key="yaw_mode",
+                label="Base yaw",
+                flag="--yaw-mode",
+                choices=("keep", "strip"),
+                default="keep",
+            ),
+        ),
+        fields=(
+            Field("endpoint", "Endpoint", "--endpoint", placeholder="tcp://127.0.0.1:5556"),
+            Field("max_frames", "Max frames", "--max-frames", placeholder="0"),
+        ),
+        toggles=(
+            Toggle("no_show", "No window", "--no-show"),
+            Toggle("refresh_model", "Refresh model", "--refresh-model"),
+        ),
+    ),
+    DemoSpec(
         key="play-human-joint-clip",
         title="Play Human Joint Clip",
         script=PROJECT_ROOT / "demos" / "demo_play_human_joint_clip.py",

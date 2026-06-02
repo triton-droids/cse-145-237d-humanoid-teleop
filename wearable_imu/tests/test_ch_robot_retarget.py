@@ -29,6 +29,11 @@ from ik.ch_robot_retarget import (
     to_robot_frame,
     twist_about_axis,
 )
+from ik.zmq_human_joint_stream import (
+    HUMAN_JOINT_TOPIC,
+    decode_human_joint_frame,
+    encode_human_joint_frame,
+)
 from model.lower_body import LegPose
 
 
@@ -191,6 +196,28 @@ def test_load_actual_recorded_clip_if_available() -> None:
     assert qvel.shape == (clip.joint_positions.shape[0], QVEL_WIDTH)
     assert np.all(np.isfinite(qpos))
     assert np.all(np.isfinite(qvel))
+
+
+def test_zmq_human_joint_frame_roundtrip() -> None:
+    points = _neutral_joint_positions()
+
+    parts = encode_human_joint_frame(
+        points,
+        frame_index=3,
+        clip_time_s=0.06,
+        timestamp_s=123.0,
+        root_quat_wxyz=np.array([1.0, 0.0, 0.0, 0.0]),
+        fps=50.0,
+        frame_key="joint_pos_origin",
+    )
+    header, decoded = decode_human_joint_frame(parts)
+
+    assert parts[0] == HUMAN_JOINT_TOPIC
+    assert header["frame_index"] == 3
+    assert header["timestamp_s"] == pytest.approx(123.0)
+    assert header["fps"] == pytest.approx(50.0)
+    assert header["root_quat_wxyz"] == [1.0, 0.0, 0.0, 0.0]
+    np.testing.assert_allclose(decoded, points)
 
 
 def test_retargeted_qpos_matches_repo_root_contract_validator() -> None:

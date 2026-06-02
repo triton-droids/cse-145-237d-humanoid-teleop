@@ -74,6 +74,8 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 | `demo_live_retarget.py` | Headless live Plan A bridge: IMU packets -> calibrated lower-body skeleton -> ch_robot `qpos[17]` and `qvel[16]`, emitted as JSON lines over stdout or UDP. | `--config {thighs,shanks,full}`, `--output {stdout,udp,none}`, `--target-host`, `--target-port`, `--fps`, `--yaw-mode {keep,strip}` |
 | `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` IMU handoff clip through Plan A, visualize the skeleton, and show the resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--no-show` |
 | `demo_mujoco_ch_robot_replay.py` | Replay a recorded IMU handoff clip or saved ch_robot qpos replay on the real Holosoma `ch_robot_10dof.xml` MuJoCo model. Auto-extracts XML/meshes from `retargeting_holosoma` into `.cache/`. | positional `input`, `--speed`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--no-show`, `--refresh-model` |
+| `demo_zmq_human_joint_publisher.py` | Publish a recorded `human_joint_clip_*.npz` as mock-live 9-joint frames over ZeroMQ at 50 Hz or a chosen rate. | positional `clip`, `--endpoint`, `--fps`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--max-frames` |
+| `demo_mujoco_ch_robot_zmq.py` | Subscribe to mock-live ZMQ human joint frames, convert each frame to ch_robot `qpos/qvel`, and update the real MuJoCo robot online. | `--endpoint`, `--yaw-mode {keep,strip}`, `--no-show`, `--max-frames` |
 | `demo_record_human_joint_clip.py` | Offline recorder that saves ML retargeting joint positions (`Spine1`, hips, knees, ankles, and generated toe points) to `.npz`. | `--config {thighs,shanks,full}`, `--duration-s`, `--fps`, `--output` |
 | `demo_udp_quaternion_receiver.py` | Text-only packet monitor: per-segment rate, age, receive/sensor jitter, drops, raw quaternions. | `--host`, `--port`, `--max-age-ms` |
 | `demo_udp_latency_ping.py` | Round-trip UDP latency test to one node. | positional `esp32_ip`, `--port`, `--count`, `--interval-ms`, `--timeout-ms` |
@@ -104,6 +106,12 @@ python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_23
 
 # Or run a saved qpos/qvel replay on the actual ch_robot MuJoCo model
 python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_20260601_231345.npz
+
+# Mock-live ZMQ stream from a recorded dataset at 50 Hz
+python demos/demo_zmq_human_joint_publisher.py ../data/human_joint_clip_20260601_231345.npz --fps 50
+
+# In another terminal, consume that ZMQ stream and drive the actual ch_robot MuJoCo model
+python demos/demo_mujoco_ch_robot_zmq.py
 
 # Check packets are arriving before launching the viewer
 python demos/demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
