@@ -1,6 +1,6 @@
 # Holosoma ch_robot Validation Sample
 
-This folder keeps a small converted motion artifact from the Holosoma `ch_robot`
+This folder has a small converted motion artifact from our Holosoma `ch_robot`
 retargeting validation run.
 
 ## File
@@ -11,17 +11,17 @@ retargeting validation run.
 
 ## Source
 
-The full Holosoma integration source is kept on:
+We keep the full Holosoma integration source on:
 
 https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/retargeting_holosoma
 
-This sample was copied from the simulation data path:
+We copied this sample from the simulation data path:
 
 ```text
 source/tritonhumanoid/tritonhumanoid/data/motions/sub10_largebox_049_clip120_mj_fps50.npz
 ```
 
-The larger source archive `OMOMO_new.zip` is intentionally not committed.
+We intentionally don't commit the larger source archive `OMOMO_new.zip`.
 
 ## Verified Shape Contract
 

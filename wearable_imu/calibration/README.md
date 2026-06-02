@@ -10,7 +10,7 @@ Initial calibration plan:
 
 ```text
 neutral standing capture
-    -> collect fresh packets for the active segment_id values
+    -> collect fresh packets for all 7 segment_id values
     -> average sensor quaternions per segment
     -> define session reference
     -> align thigh/shank headings

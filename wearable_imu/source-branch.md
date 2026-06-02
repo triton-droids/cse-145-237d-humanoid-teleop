@@ -1,13 +1,16 @@
 # Wearable IMU Source Branch
 
-The wearable IMU, inverse-kinematics, calibration, hardware, demo, and test code
-was originally developed on this branch:
+We originally developed the wearable IMU, inverse-kinematics, calibration, hardware, demo, and test code on this branch:
 
 https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/inverse-kinematics
 
-In the course-project integration branch, that branch's repository-root content
-is organized under `wearable_imu/` so it can live beside the perception,
-retargeting, simulation, reports, and media folders.
+Latest integrated source tip:
+
+```text
+origin/inverse-kinematics@66a6454a8e592c4ada3b839dbc1d7a56b8d2e750
+```
+
+In our course-project integration branch, we organized that branch's repository-root content under `wearable_imu/` so it can live beside the perception, retargeting, simulation, reports, and media folders.
 
 ## Layout Mapping
 
@@ -25,10 +28,10 @@ retargeting, simulation, reports, and media folders.
 
 ## Sync Policy
 
-Keep the integrated `wearable_imu/` tree focused on source code, tests, hardware
-sketches, setup files, and small documentation. Do not copy branch-root
+We keep the integrated `wearable_imu/` tree focused on source code, tests, hardware
+sketches, setup files, and small documentation. We don't copy branch-root
 `.DS_Store` files, local captures, generated plots, environment folders, or
 temporary hardware logs into this branch.
 
-When `inverse-kinematics` changes, review the diff first and sync only the
+When `inverse-kinematics` changes, we review the diff first and sync only the
 source/documentation changes that should be part of the main project repository.

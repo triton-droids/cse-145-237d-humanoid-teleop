@@ -13,20 +13,14 @@ from model.lower_body import LowerBodyDimensions, LegPose, SegmentFrame, Side
 from sensor.packet import SegmentId
 
 
-REQUIRED_LOWER_BODY_SEGMENTS = (
-    SegmentId.PELVIS,
-    SegmentId.LEFT_THIGH,
-    SegmentId.LEFT_SHANK,
-    SegmentId.LEFT_FOOT,
-    SegmentId.RIGHT_THIGH,
-    SegmentId.RIGHT_SHANK,
-    SegmentId.RIGHT_FOOT,
-)
-
-
 @dataclass(frozen=True)
 class LowerBodySkeleton:
-    """Aggregated pelvis, leg, and foot pose from seven segment orientations."""
+    """Aggregated lower-body skeleton from partial or full segment orientations.
+
+    ``available_segments`` records which segments had real IMU data.  All other
+    segments were filled with their proximal neighbour's orientation (neutral
+    joint assumption) and their ``LegPose`` joint rotation is ``None``.
+    """
 
     pelvis_center: np.ndarray
     hip_centers: dict[Side, np.ndarray]
@@ -34,6 +28,7 @@ class LowerBodySkeleton:
     segments: dict[str, SegmentFrame]
     joint_rotations: dict[Side, LegPose]
     segment_orientations: dict[SegmentId, Rotation]
+    available_segments: frozenset[SegmentId]
 
 
 def aggregate_lower_body_skeleton(
@@ -42,25 +37,21 @@ def aggregate_lower_body_skeleton(
     dimensions: LowerBodyDimensions = LowerBodyDimensions(),
     pelvis_center: np.ndarray | None = None,
 ) -> LowerBodySkeleton:
-    """Build one coherent lower-body skeleton from calibrated segment rotations.
+    """Build a lower-body skeleton from available calibrated segment orientations.
 
-    The input rotations are expected to be world-from-segment orientations after
-    packet parsing, filtering, and calibration have already normalized the data.
-    This function does not read UDP packets and does not apply sensor mounts.
+    Missing distal segments are filled with their proximal neighbour's
+    orientation (straight/neutral joint).  At minimum ``SegmentId.PELVIS`` plus
+    one thigh per side should be provided; if even those are absent the pelvis
+    defaults to identity and the thigh inherits it.
+
+    The returned skeleton records which segments had real IMU data in
+    ``available_segments``; the corresponding ``LegPose`` knee/ankle fields are
+    ``None`` for estimated joints.
     """
 
-    missing = [
-        segment.name
-        for segment in REQUIRED_LOWER_BODY_SEGMENTS
-        if segment not in segment_orientations
-    ]
-    if missing:
-        raise ValueError(f"missing lower-body segment orientations: {', '.join(missing)}")
+    available = frozenset(segment_orientations.keys())
+    orientations = _fill_missing_orientations(segment_orientations)
 
-    orientations = {
-        segment: segment_orientations[segment]
-        for segment in REQUIRED_LOWER_BODY_SEGMENTS
-    }
     pelvis_rotation = orientations[SegmentId.PELVIS]
     pelvis_origin = (
         np.array([0.0, 0.0, 1.0], dtype=float)
@@ -93,6 +84,8 @@ def aggregate_lower_body_skeleton(
         segments=segments,
         joint_rotations=joint_rotations,
         pelvis_rotation=pelvis_rotation,
+        has_shank=SegmentId.LEFT_SHANK in available,
+        has_foot=SegmentId.LEFT_FOOT in available,
     )
     _add_leg(
         side="right",
@@ -105,6 +98,8 @@ def aggregate_lower_body_skeleton(
         segments=segments,
         joint_rotations=joint_rotations,
         pelvis_rotation=pelvis_rotation,
+        has_shank=SegmentId.RIGHT_SHANK in available,
+        has_foot=SegmentId.RIGHT_FOOT in available,
     )
 
     return LowerBodySkeleton(
@@ -113,8 +108,25 @@ def aggregate_lower_body_skeleton(
         joints=joints,
         segments=segments,
         joint_rotations=joint_rotations,
-        segment_orientations=orientations,
+        segment_orientations=dict(orientations),
+        available_segments=available,
     )
+
+
+def _fill_missing_orientations(
+    provided: Mapping[SegmentId, Rotation],
+) -> dict[SegmentId, Rotation]:
+    """Fill absent distal segments with parent orientation (neutral joint)."""
+    filled: dict[SegmentId, Rotation] = dict(provided)
+    pelvis = filled.setdefault(SegmentId.PELVIS, Rotation.identity())
+    for thigh_id, shank_id, foot_id in (
+        (SegmentId.LEFT_THIGH, SegmentId.LEFT_SHANK, SegmentId.LEFT_FOOT),
+        (SegmentId.RIGHT_THIGH, SegmentId.RIGHT_SHANK, SegmentId.RIGHT_FOOT),
+    ):
+        thigh = filled.setdefault(thigh_id, pelvis)
+        shank = filled.setdefault(shank_id, thigh)
+        filled.setdefault(foot_id, shank)
+    return filled
 
 
 def _add_leg(
@@ -129,6 +141,8 @@ def _add_leg(
     segments: dict[str, SegmentFrame],
     joint_rotations: dict[Side, LegPose],
     pelvis_rotation: Rotation,
+    has_shank: bool,
+    has_foot: bool,
 ) -> None:
     knee_center = hip_center + thigh_rotation.apply([0.0, 0.0, -dimensions.thigh_length])
     ankle_center = knee_center + shank_rotation.apply([0.0, 0.0, -dimensions.shank_length])
@@ -167,6 +181,6 @@ def _add_leg(
     )
     joint_rotations[side] = LegPose(
         hip=relative_rotation(pelvis_rotation, thigh_rotation),
-        knee=relative_rotation(thigh_rotation, shank_rotation),
-        ankle=relative_rotation(shank_rotation, foot_rotation),
+        knee=relative_rotation(thigh_rotation, shank_rotation) if has_shank else None,
+        ankle=relative_rotation(shank_rotation, foot_rotation) if has_foot else None,
     )

@@ -58,10 +58,10 @@ Current identity assumptions:
 - valid lower-body segment IDs are `0..6`.
 - `255` means unknown/unassigned.
 
-Run the first receiver-side demo:
+Run the first receiver demo on the laptop connected to the same phone hotspot:
 
 ```powershell
-conda run -p .\.conda python demos\demo_udp_quaternion_receiver.py
+conda run --no-capture-output -n humanoid-sim python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
 ```
 
 ## Current Filtering

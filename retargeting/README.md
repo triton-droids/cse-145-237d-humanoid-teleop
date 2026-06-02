@@ -1,6 +1,6 @@
 # Retargeting
 
-This folder contains the project-specific retargeting contract for the Triton humanoid robot. It does not vendor the full Holosoma source tree.
+This folder contains our project-specific retargeting contract for the Triton humanoid robot. We don't vendor the full Holosoma source tree here.
 
 ## Role in the Pipeline
 
@@ -12,7 +12,7 @@ wearable_imu/ or perception/depth_camera/
     -> simulation repository policy training
 ```
 
-The dedicated simulation code lives in:
+Our dedicated simulation code lives in:
 
 https://github.com/triton-droids/simulation
 
@@ -28,7 +28,7 @@ https://github.com/triton-droids/simulation
 
 ## Retargeted Motion Contract
 
-The retargeter output is a compact `.npz` file with:
+Our retargeter output is a compact `.npz` file with:
 
 ```text
 qpos
@@ -78,14 +78,14 @@ For `ch_robot`, `joint_pos` has width 17 and `joint_vel` has width 16 because Mu
 
 ## Holosoma Integration
 
-The full Holosoma source used for this project is preserved on the
+We preserve the full Holosoma source used for this project on the
 `retargeting_holosoma` branch:
 
 https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/retargeting_holosoma
 
-See [`holosoma-source.md`](holosoma-source.md) for the recommended worktree
-workflow. Apply the patch in `patches/` to a Holosoma checkout instead of
-copying Holosoma into this branch. The patch adds:
+See [`holosoma-source.md`](holosoma-source.md) for our recommended worktree
+workflow. Apply the patch in `patches/` to a Holosoma checkout — we don't copy
+Holosoma into this branch. The patch adds:
 
 - `ch_robot` default joint order
 - dynamic robot DOF slicing instead of hardcoded G1 29-DOF slicing
@@ -93,4 +93,5 @@ copying Holosoma into this branch. The patch adds:
 - `--headless` conversion mode for batch runs
 - path quoting fixes in setup scripts
 
-The robot meshes and full MuJoCo/URDF assets should stay in the simulation or Holosoma worktree, not in this course repository.
+We keep robot meshes and full MuJoCo/URDF assets in the simulation or Holosoma
+worktree, not in this course repository.

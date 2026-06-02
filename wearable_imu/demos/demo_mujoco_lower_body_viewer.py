@@ -28,7 +28,8 @@ from simulator.mujoco_lower_body import (  # noqa: E402
     build_lower_body_mjcf,
     clamp_ctrl_to_actuator_ranges,
     format_pose_readout_from_imus,
-    lower_body_points_from_qpos,
+    lower_body_points_from_skeleton,
+    lower_body_skeleton_from_imus,
     pose_overlay_columns_from_imus,
     pose_presets,
     preset_qpos,
@@ -347,16 +348,31 @@ def main() -> None:
         pose_axis.view_init(elev=18, azim=-62)
         estimator_axes = {"pose3d": pose_axis}
 
-        def init_line(axis, color: str, label: str):
-            (line,) = axis.plot([], [], [], color=color, linewidth=3, marker="o", label=label)
+        def init_line(axis, color: str, label: str, linestyle: str = "solid"):
+            (line,) = axis.plot(
+                [], [], [], color=color, linewidth=3, marker="o",
+                label=label, linestyle=linestyle,
+            )
             return line
 
+        _L = "#2a9d8f"
+        _R = "#e76f51"
+        _LE = "#8ec8c2"  # lighter teal for estimated left segments
+        _RE = "#f0b49a"  # lighter orange for estimated right segments
         estimator_lines = {
-            "pelvis": init_line(pose_axis, "#333333", "pelvis"),
-            "left_leg": init_line(pose_axis, "#2a9d8f", "left leg"),
-            "right_leg": init_line(pose_axis, "#e76f51", "right leg"),
-            "left_foot": init_line(pose_axis, "#2a9d8f", "left foot"),
-            "right_foot": init_line(pose_axis, "#e76f51", "right foot"),
+            "pelvis":       init_line(pose_axis, "#333333", "pelvis"),
+            "left_thigh":   init_line(pose_axis, _L, "left"),
+            "left_shank":   init_line(pose_axis, _L, ""),
+            "left_foot":    init_line(pose_axis, _L, ""),
+            "right_thigh":  init_line(pose_axis, _R, "right"),
+            "right_shank":  init_line(pose_axis, _R, ""),
+            "right_foot":   init_line(pose_axis, _R, ""),
+            "left_thigh_est":  init_line(pose_axis, _LE, "", linestyle="dashed"),
+            "left_shank_est":  init_line(pose_axis, _LE, "", linestyle="dashed"),
+            "left_foot_est":   init_line(pose_axis, _LE, "", linestyle="dashed"),
+            "right_thigh_est": init_line(pose_axis, _RE, "", linestyle="dashed"),
+            "right_shank_est": init_line(pose_axis, _RE, "", linestyle="dashed"),
+            "right_foot_est":  init_line(pose_axis, _RE, "", linestyle="dashed"),
         }
 
         pose_axis.legend(loc="upper left", fontsize=9)
@@ -383,28 +399,40 @@ def main() -> None:
         estimator_text = text
         return window
 
-    def update_estimator_pose_view(qpos: np.ndarray) -> None:
+    def update_estimator_pose_view(imu: dict) -> None:
         if estimator_canvas is None:
             return
 
-        points = lower_body_points_from_qpos(qpos)
+        skeleton = lower_body_skeleton_from_imus(imu)
+        measured, estimated = lower_body_points_from_skeleton(skeleton)
 
-        def set_line(name: str, coords: np.ndarray) -> None:
-            line = estimator_lines[name]
+        _seg_keys = (
+            "left_thigh", "left_shank", "left_foot",
+            "right_thigh", "right_shank", "right_foot",
+        )
+
+        def _set(line_key: str, coords: np.ndarray) -> None:
+            line = estimator_lines[line_key]
             line.set_data(coords[:, 0], coords[:, 1])
             line.set_3d_properties(coords[:, 2])
+            line.set_visible(True)
 
-        set_line("pelvis", points["pelvis"])
-        set_line("left_leg", points["left_leg"])
-        set_line("right_leg", points["right_leg"])
-        set_line("left_foot", points["left_foot"])
-        set_line("right_foot", points["right_foot"])
+        pelvis_pts = measured.get("pelvis")
+        if pelvis_pts is not None:
+            _set("pelvis", pelvis_pts)
+
+        for key in _seg_keys:
+            if key in measured:
+                _set(key, measured[key])
+                estimator_lines[f"{key}_est"].set_visible(False)
+            else:
+                _set(f"{key}_est", estimated[key])
+                estimator_lines[key].set_visible(False)
 
         estimator_canvas.draw_idle()
 
     def refresh_estimator_ui(
         imu,
-        qpos: np.ndarray,
         *,
         preset_name: str,
         animate: bool,
@@ -425,7 +453,7 @@ def main() -> None:
             preset_name=preset_name,
             animate=animate,
         )
-        update_estimator_pose_view(qpos)
+        update_estimator_pose_view(imu)
         estimator_text.configure(state="normal")
         estimator_text.delete("1.0", "end")
         estimator_text.insert("1.0", readout)
@@ -526,7 +554,6 @@ def main() -> None:
                     sync_slider_vars()
                 refresh_estimator_ui(
                     imu,
-                    data.qpos,
                     preset_name=preset_name,
                     animate=animate,
                 )

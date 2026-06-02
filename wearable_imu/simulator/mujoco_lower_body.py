@@ -14,9 +14,12 @@ from ik.imu_orientation import (
     default_lower_limb_mounts,
     front_pelvis_mount,
     imu_orientation_from_segment,
+    segment_orientation_from_imu,
     solve_lower_limb_joints_from_imus,
 )
+from ik.lower_body_aggregation import LowerBodySkeleton, aggregate_lower_body_skeleton
 from model.lower_body import LowerBodyDimensions, default_pose
+from sensor.packet import SegmentId
 
 
 JOINT_NAMES = (
@@ -371,29 +374,90 @@ def lower_body_points_from_qpos(
 def lower_limb_solutions_from_imus(
     imu: dict[str, Rotation],
 ) -> tuple[LowerLimbOrientationSolution, LowerLimbOrientationSolution]:
-    """Solve left and right lower-limb joints from virtual or real IMU rotations."""
+    """Solve left and right lower-limb joints from partial or full IMU rotations."""
+
+    pelvis_mounts = {"pelvis": front_pelvis_mount()} if "pelvis" in imu else None
+
+    def _side_imu(side: str) -> dict[str, Rotation]:
+        local_keys = {"thigh": f"{side}_thigh", "shank": f"{side}_shank", "foot": f"{side}_foot"}
+        result = {local: imu[key] for local, key in local_keys.items() if key in imu}
+        if "pelvis" in imu:
+            result["pelvis"] = imu["pelvis"]
+        return result
 
     left_solution = solve_lower_limb_joints_from_imus(
-        {
-            "pelvis": imu["pelvis"],
-            "thigh": imu["left_thigh"],
-            "shank": imu["left_shank"],
-            "foot": imu["left_foot"],
-        },
-        side="left",
-        mounts={"pelvis": front_pelvis_mount()},
+        _side_imu("left"), side="left", mounts=pelvis_mounts
     )
     right_solution = solve_lower_limb_joints_from_imus(
-        {
-            "pelvis": imu["pelvis"],
-            "thigh": imu["right_thigh"],
-            "shank": imu["right_shank"],
-            "foot": imu["right_foot"],
-        },
-        side="right",
-        mounts={"pelvis": front_pelvis_mount()},
+        _side_imu("right"), side="right", mounts=pelvis_mounts
     )
     return left_solution, right_solution
+
+
+def lower_body_skeleton_from_imus(
+    imu: dict[str, Rotation],
+    dimensions: LowerBodyDimensions = LowerBodyDimensions(),
+) -> LowerBodySkeleton:
+    """Convert an IMU orientation dict to a LowerBodySkeleton, applying mount calibrations."""
+
+    _seg_map: dict[str, tuple[SegmentId, Rotation]] = {
+        "pelvis": (SegmentId.PELVIS, front_pelvis_mount()),
+        "left_thigh": (SegmentId.LEFT_THIGH, default_lower_limb_mounts("left")["thigh"]),
+        "left_shank": (SegmentId.LEFT_SHANK, default_lower_limb_mounts("left")["shank"]),
+        "left_foot": (SegmentId.LEFT_FOOT, default_lower_limb_mounts("left")["foot"]),
+        "right_thigh": (SegmentId.RIGHT_THIGH, default_lower_limb_mounts("right")["thigh"]),
+        "right_shank": (SegmentId.RIGHT_SHANK, default_lower_limb_mounts("right")["shank"]),
+        "right_foot": (SegmentId.RIGHT_FOOT, default_lower_limb_mounts("right")["foot"]),
+    }
+    segment_orientations = {
+        seg_id: segment_orientation_from_imu(imu[name], mount)
+        for name, (seg_id, mount) in _seg_map.items()
+        if name in imu
+    }
+    return aggregate_lower_body_skeleton(segment_orientations, dimensions=dimensions)
+
+
+def lower_body_points_from_skeleton(
+    skeleton: LowerBodySkeleton,
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    """Return skeleton joint coordinates split into measured and estimated dicts.
+
+    Each segment key (e.g. ``"left_thigh"``) appears in exactly one of the two
+    returned dicts.  Segments in ``measured`` had a real IMU reading; segments
+    in ``estimated`` were filled with a neutral orientation.
+    """
+
+    j = skeleton.joints
+    av = skeleton.available_segments
+
+    measured: dict[str, np.ndarray] = {
+        "pelvis": np.vstack([j["left_hip"], j["right_hip"]]),
+    }
+    estimated: dict[str, np.ndarray] = {}
+
+    for side, thigh_id, shank_id, foot_id in (
+        ("left", SegmentId.LEFT_THIGH, SegmentId.LEFT_SHANK, SegmentId.LEFT_FOOT),
+        ("right", SegmentId.RIGHT_THIGH, SegmentId.RIGHT_SHANK, SegmentId.RIGHT_FOOT),
+    ):
+        hip_pt = j[f"{side}_hip"]
+        knee_pt = j[f"{side}_knee"]
+        ankle_pt = j[f"{side}_ankle"]
+
+        (measured if thigh_id in av else estimated)[f"{side}_thigh"] = np.vstack(
+            [hip_pt, knee_pt]
+        )
+        (measured if shank_id in av else estimated)[f"{side}_shank"] = np.vstack(
+            [knee_pt, ankle_pt]
+        )
+        (measured if foot_id in av else estimated)[f"{side}_foot"] = np.vstack(
+            [j[f"{side}_heel"], ankle_pt, j[f"{side}_toe"]]
+        )
+
+    return measured, estimated
+
+
+def _fmt_deg(angles: tuple[float, float, float] | None, idx: int = 1) -> str:
+    return f"{angles[idx]:6.1f}" if angles is not None else "   ---"
 
 
 def format_pose_readout_from_imus(
@@ -402,30 +466,34 @@ def format_pose_readout_from_imus(
     preset_name: str,
     animate: bool,
 ) -> str:
-    """Return a compact live readout from virtual or real IMU orientations."""
+    """Return a compact live readout from partial or full IMU orientations."""
 
     left_solution, right_solution = lower_limb_solutions_from_imus(imu)
-
-    pelvis_xyzw = imu["pelvis"].as_quat()
-    pelvis_wxyz = (pelvis_xyzw[3], pelvis_xyzw[0], pelvis_xyzw[1], pelvis_xyzw[2])
     left_xyz = left_solution.joints.euler_xyz_degrees()
     right_xyz = right_solution.joints.euler_xyz_degrees()
+
+    if "pelvis" in imu:
+        pelvis_xyzw = imu["pelvis"].as_quat()
+        pelvis_wxyz = (pelvis_xyzw[3], pelvis_xyzw[0], pelvis_xyzw[1], pelvis_xyzw[2])
+        pelvis_str = (
+            f"{pelvis_wxyz[0]:6.3f} {pelvis_wxyz[1]:6.3f}"
+            f" {pelvis_wxyz[2]:6.3f} {pelvis_wxyz[3]:6.3f}"
+        )
+    else:
+        pelvis_str = "  ---    ---    ---    ---"
 
     return "\n".join(
         [
             "MuJoCo lower-body live readout",
             f"preset: {preset_name} | animate: {animate}",
+            f"pelvis imu quat wxyz: {pelvis_str}",
             (
-                "pelvis imu quat wxyz: "
-                f"{pelvis_wxyz[0]:6.3f} {pelvis_wxyz[1]:6.3f} {pelvis_wxyz[2]:6.3f} {pelvis_wxyz[3]:6.3f}"
+                "left  hip/knee/ankle y deg:"
+                f" {_fmt_deg(left_xyz['hip'])} {_fmt_deg(left_xyz['knee'])} {_fmt_deg(left_xyz['ankle'])}"
             ),
             (
-                "left  hip/knee/ankle y deg: "
-                f"{left_xyz['hip'][1]:6.1f} {left_xyz['knee'][1]:6.1f} {left_xyz['ankle'][1]:6.1f}"
-            ),
-            (
-                "right hip/knee/ankle y deg: "
-                f"{right_xyz['hip'][1]:6.1f} {right_xyz['knee'][1]:6.1f} {right_xyz['ankle'][1]:6.1f}"
+                "right hip/knee/ankle y deg:"
+                f" {_fmt_deg(right_xyz['hip'])} {_fmt_deg(right_xyz['knee'])} {_fmt_deg(right_xyz['ankle'])}"
             ),
             "keys: 1 standing | 2 squat | 3 step | space animate",
             "      q/a w/s e/d left | u/j i/k o/l right",
@@ -449,14 +517,21 @@ def pose_overlay_columns_from_imus(
     preset_name: str,
     animate: bool,
 ) -> tuple[str, str]:
-    """Return left/right overlay text from virtual or real IMU orientations."""
+    """Return left/right overlay text from partial or full IMU orientations."""
 
     left_solution, right_solution = lower_limb_solutions_from_imus(imu)
-
-    pelvis_xyzw = imu["pelvis"].as_quat()
-    pelvis_wxyz = (pelvis_xyzw[3], pelvis_xyzw[0], pelvis_xyzw[1], pelvis_xyzw[2])
     left_xyz = left_solution.joints.euler_xyz_degrees()
     right_xyz = right_solution.joints.euler_xyz_degrees()
+
+    if "pelvis" in imu:
+        pelvis_xyzw = imu["pelvis"].as_quat()
+        pelvis_wxyz = (pelvis_xyzw[3], pelvis_xyzw[0], pelvis_xyzw[1], pelvis_xyzw[2])
+        pelvis_line = (
+            f"{pelvis_wxyz[0]:6.3f} {pelvis_wxyz[1]:6.3f}"
+            f" {pelvis_wxyz[2]:6.3f} {pelvis_wxyz[3]:6.3f}"
+        )
+    else:
+        pelvis_line = "  ---    ---    ---    ---"
 
     left_column = "\n".join(
         [
@@ -465,15 +540,15 @@ def pose_overlay_columns_from_imus(
             f"animate: {animate}",
             "",
             "Pelvis IMU quat wxyz",
-            f"{pelvis_wxyz[0]:6.3f} {pelvis_wxyz[1]:6.3f} {pelvis_wxyz[2]:6.3f} {pelvis_wxyz[3]:6.3f}",
+            pelvis_line,
             "",
             "Estimated sagittal angles (deg)",
-            f"L hip   {left_xyz['hip'][1]:6.1f}",
-            f"L knee  {left_xyz['knee'][1]:6.1f}",
-            f"L ankle {left_xyz['ankle'][1]:6.1f}",
-            f"R hip   {right_xyz['hip'][1]:6.1f}",
-            f"R knee  {right_xyz['knee'][1]:6.1f}",
-            f"R ankle {right_xyz['ankle'][1]:6.1f}",
+            f"L hip   {_fmt_deg(left_xyz['hip'])}",
+            f"L knee  {_fmt_deg(left_xyz['knee'])}",
+            f"L ankle {_fmt_deg(left_xyz['ankle'])}",
+            f"R hip   {_fmt_deg(right_xyz['hip'])}",
+            f"R knee  {_fmt_deg(right_xyz['knee'])}",
+            f"R ankle {_fmt_deg(right_xyz['ankle'])}",
         ]
     )
 

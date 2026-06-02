@@ -4,9 +4,9 @@ Wearable lower-body motion capture and simulation-based policy training for huma
 
 ## Abstract
 
-This project builds a humanoid teleoperation pipeline that lets a humanoid robot imitate lower-body human motion. The system combines wearable IMU nodes, a depth-camera perception baseline, calibration and inverse kinematics, retargeting to the Triton humanoid model, and reinforcement-learning simulation in Isaac Lab.
+We built a humanoid teleoperation pipeline that lets a humanoid robot imitate lower-body human motion. Our system combines wearable IMU nodes, a depth-camera perception baseline, calibration and inverse kinematics, retargeting to the Triton humanoid model, and reinforcement-learning simulation in Isaac Lab.
 
-The target pipeline is:
+Our pipeline is:
 
 ```text
 Wearable IMUs / RGB-D camera
@@ -18,17 +18,17 @@ Wearable IMUs / RGB-D camera
 
 ## Repository Organization
 
-| Path | Purpose |
-|---|---|
-| `wearable_imu/` | Real-world BNO085 + ESP32-S3 IMU pipeline, UDP packets, calibration, filtering, IK, tests, and demos. |
-| `perception/depth_camera/` | Intel RealSense D435 + MediaPipe pose-estimation baseline. |
-| `retargeting/` | Triton humanoid retargeting contract, `ch_robot` joint order, and Holosoma patch notes. |
-| `simulation/` | Pointer to the dedicated Isaac Lab training repository and pinned simulation commit. |
-| `data/retargeting_samples/` | Small sample retargeting captures used for pipeline validation. |
-| `data/retargeting_experiments/` | Curated small experiment outputs that verify retargeting and conversion contracts. |
-| `docs/` | Project overview, architecture, setup notes, migration notes, and internal planning documents. |
-| `reports/` | CSE 145/237D reports, milestone material, presentations, and final deliverables. |
-| `media/` | Demo videos, screenshots, and images for the project page and final presentation. |
+| Path                            | Purpose                                                                                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `wearable_imu/`                 | Real-world BNO085 + ESP32-S3 IMU pipeline, UDP packets, calibration, filtering, IK, tests, and demos. |
+| `perception/depth_camera/`      | Intel RealSense D435 + MediaPipe pose-estimation baseline.                                            |
+| `retargeting/`                  | Triton humanoid retargeting contract, `ch_robot` joint order, and Holosoma patch notes.               |
+| `simulation/`                   | Pointer to the dedicated Isaac Lab training repository and pinned simulation commit.                  |
+| `data/retargeting_samples/`     | Small sample retargeting captures used for pipeline validation.                                       |
+| `data/retargeting_experiments/` | Curated small experiment outputs that verify retargeting and conversion contracts.                    |
+| `docs/`                         | Project overview, architecture, setup notes, migration notes, and internal planning documents.        |
+| `reports/`                      | CSE 145/237D reports, milestone material, presentations, and final deliverables.                      |
+| `media/`                        | Demo videos, screenshots, and images for the project page and final presentation.                     |
 
 ## Current Status
 
@@ -37,12 +37,12 @@ Wearable IMUs / RGB-D camera
 - Lower-body orientation IK and MuJoCo synthetic test harness exist for validation.
 - RealSense D435 + MediaPipe baseline estimates depth-backed pose landmarks.
 - Triton humanoid retargeting contract and CH robot Holosoma converter patch are documented.
-- Isaac Lab humanoid locomotion simulation exists and is being extended toward motion tracking.
+- Isaac Lab humanoid locomotion simulation is running and we are extending it toward motion tracking.
 - Final sim-to-real deployment is still in progress.
 
 ## Quick Start
 
-Each subsystem has its own setup notes:
+Each subsystem has its own setup notes — start there if you're new to a component:
 
 - Wearable IMU pipeline: [`wearable_imu/README.md`](wearable_imu/README.md)
 - Depth-camera baseline: [`perception/depth_camera/README.md`](perception/depth_camera/README.md)
@@ -54,14 +54,14 @@ Each subsystem has its own setup notes:
 
 Triton Droids, UC San Diego.
 
-| Name | Role | Focus |
-|---|---|---|
-| Darin Djapri | Team Lead | ML/RL, policy & reward design, IsaacLab simulation, sim-to-real |
-| Fong-Yu (Yang) Lin | ML Engineer | RL, policy & reward functions, Sim2Sim (IsaacLab → MuJoCo), data pipeline |
-| Cindy Chen | ML Engineer | Human pose extraction, 3D keypoint retargeting, Holosoma pipeline |
-| Parth Trivedi | Embedded Engineer | IMU + ESP32 hardware, Jetson integration, depth estimation baseline |
-| Neal Jian | Embedded Engineer | Wearable IMU hardware & battery design, ESP32 firmware, UART/wireless pipeline, IK from quaternions, motion retargeting, free-root walking |
-| Tauhid Malik | Embedded Engineer | IMU aggregation pipeline, Jetson networking, hardware bring-up |
+| Name               | Role              | Focus                                                                                                            |
+| ------------------ | ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| Darin Djapri       | Team Lead         | ML/RL, policy & reward design, IsaacLab simulation, sim-to-real                                                  |
+| Fong-Yu (Yang) Lin | ML Engineer       | RL, policy & reward functions, Sim2Sim (IsaacLab → MuJoCo), data pipeline                                        |
+| Cindy Chen         | ML Engineer       | Human pose extraction, 3D keypoint retargeting, Holosoma pipeline                                                |
+| Parth Trivedi      | Embedded Engineer | IMU + ESP32 hardware, Jetson integration, depth estimation baseline                                             |
+| Neal Jian          | Embedded Engineer | Wearable IMU hardware & battery design, ESP32 firmware, UART/wireless pipeline, IK from quaternions, motion retargeting, free-root walking |
+| Tauhid Malik       | Embedded Engineer | IMU aggregation pipeline, Jetson networking, hardware bring-up                                                   |
 
 ## CSE 145/237D Materials
 
@@ -71,8 +71,12 @@ Course-facing deliverables are collected under [`reports/`](reports/):
 - Presentations: [`reports/presentations/`](reports/presentations/)
 - Demo media: [`media/`](media/)
 
-## Artifact Policy
+## Source Mapping
 
-Training checkpoints, TensorBoard logs, generated Hydra outputs, large raw captures, and third-party source drops should not be committed directly to the main branch. Use GitHub Releases, external storage, or a clearly documented private artifact location, then link them from `reports/` or `docs/`.
-
-See [`docs/artifact-policy.md`](docs/artifact-policy.md).
+| Source                        | Destination                      | Notes                                                                                    |
+| ----------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `origin/inverse-kinematics`   | `wearable_imu/`                  | Real-world IMU packet, calibration, IK, demo, and test code.                             |
+| `origin/depthCamera`          | `perception/depth_camera/`       | RealSense D435 + MediaPipe pose-estimation baseline.                                     |
+| `origin/retargeting_data`     | `data/retargeting_samples/`      | Small sample JSONL captures.                                                             |
+| `origin/retargeting_holosoma` | `retargeting/`                   | Project-specific CH robot retargeting notes and Holosoma converter patch only.           |
+| `triton-droids/simulation`    | `simulation/README.md` link only | Current Isaac Lab humanoid simulation code stays in the dedicated simulation repository. |

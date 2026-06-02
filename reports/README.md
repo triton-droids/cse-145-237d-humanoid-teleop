@@ -1,8 +1,8 @@
 # Reports and Class Materials
 
-This folder collects CSE 145/237D deliverables.
+This folder is where we collect our CSE 145/237D deliverables.
 
-Expected contents:
+Contents:
 
 - milestone reports
 - final report

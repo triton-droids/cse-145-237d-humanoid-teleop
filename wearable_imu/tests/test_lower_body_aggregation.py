@@ -6,7 +6,7 @@ from model.lower_body import LowerBodyDimensions, build_lower_body_model
 from sensor.packet import SegmentId
 
 
-def test_missing_segment_orientation_raises_clear_error() -> None:
+def test_missing_distal_segment_orientation_uses_neutral_estimate() -> None:
     orientations = {
         SegmentId.PELVIS: Rotation.identity(),
         SegmentId.LEFT_THIGH: Rotation.identity(),
@@ -16,12 +16,14 @@ def test_missing_segment_orientation_raises_clear_error() -> None:
         SegmentId.RIGHT_SHANK: Rotation.identity(),
     }
 
-    try:
-        aggregate_lower_body_skeleton(orientations)
-    except ValueError as exc:
-        assert "RIGHT_FOOT" in str(exc)
-    else:
-        raise AssertionError("missing lower-body segment should fail")
+    skeleton = aggregate_lower_body_skeleton(orientations)
+
+    assert SegmentId.RIGHT_FOOT not in skeleton.available_segments
+    np.testing.assert_allclose(
+        skeleton.segment_orientations[SegmentId.RIGHT_FOOT].as_matrix(),
+        orientations[SegmentId.RIGHT_SHANK].as_matrix(),
+    )
+    assert skeleton.joint_rotations["right"].ankle is None
 
 
 def test_identity_orientations_produce_symmetric_standing_skeleton() -> None:

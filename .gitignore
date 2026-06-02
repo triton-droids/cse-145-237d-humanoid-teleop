@@ -50,11 +50,5 @@ events.out.tfevents.*
 *.h5
 *.hdf5
 
-# Downloaded third-party source trees or local reference copies
-holosoma-main/
-
-# Private project admin files
-CSE 145 Team List*.md
-
 # Local scraping/tooling cache
 .firecrawl/

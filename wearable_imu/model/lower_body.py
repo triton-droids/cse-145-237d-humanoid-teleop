@@ -51,8 +51,8 @@ class LowerBodyDimensions:
 @dataclass(frozen=True)
 class LegPose:
     hip: Rotation
-    knee: Rotation
-    ankle: Rotation
+    knee: Rotation | None
+    ankle: Rotation | None
 
 
 @dataclass(frozen=True)

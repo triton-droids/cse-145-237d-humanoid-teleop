@@ -1,0 +1,22 @@
+# Runtime dependencies for the demos in demos/ and the modules they call
+# (sensor/, ik/, model/, calibration/, simulator/).
+#
+# Derived from the actual imports in the codebase. tkinter is used by the
+# GUI demos but ships with CPython, so it is not listed here.
+#
+# Install with either:
+#   pip install -r requirements.txt
+#   conda run -n <env> pip install -r requirements.txt
+
+# Core numerics + rotations (used everywhere)
+numpy
+scipy
+
+# Plotting / live 3D skeleton views
+matplotlib
+
+# MuJoCo synthetic-IMU viewer (demo_mujoco_lower_body_viewer.py)
+mujoco
+
+# Test suite
+pytest

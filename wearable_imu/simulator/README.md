@@ -28,5 +28,5 @@ accuracy/status placeholders
 Current viewer:
 
 ```powershell
-conda run -p ..\.conda python ..\demos\demo_mujoco_lower_body_viewer.py
+conda run --no-capture-output -n humanoid-sim python ..\demos\demo_mujoco_lower_body_viewer.py
 ```

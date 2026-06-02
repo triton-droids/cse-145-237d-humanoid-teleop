@@ -68,8 +68,11 @@ def main() -> None:
             ("knee", pose.knee),
             ("ankle", pose.ankle),
         ):
-            x, y, z = rotation.as_euler("xyz", degrees=True)
-            print(f"  {side:<5} {joint_name:<5} x={x: 7.2f} y={y: 7.2f} z={z: 7.2f}")
+            if rotation is None:
+                print(f"  {side:<5} {joint_name:<5} (estimated neutral — no IMU)")
+            else:
+                x, y, z = rotation.as_euler("xyz", degrees=True)
+                print(f"  {side:<5} {joint_name:<5} x={x: 7.2f} y={y: 7.2f} z={z: 7.2f}")
 
 
 if __name__ == "__main__":
