@@ -1,14 +1,14 @@
 # IMU / Camera to ch_robot Retargeting Runbook
 
-本 runbook 說明如何從 recorded IMU / camera dataset 跑 retargeting、MuJoCo
-visualization、以及 50 Hz ZMQ mock-live replay。命令假設你在 macOS、使用
-`hsretargeting` conda env，並且 repo 在：
+This runbook explains how to run retargeting, MuJoCo visualization, and 50 Hz
+ZMQ mock-live replay from recorded IMU or camera datasets. The commands assume
+you are on macOS, using the `hsretargeting` conda environment, with the repo at:
 
 ```bash
 /Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop
 ```
 
-## 1. 切到正確分支
+## 1. Check Out the Correct Branch
 
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop"
@@ -17,60 +17,60 @@ git switch imu-retarget
 git pull --ff-only origin imu-retarget
 ```
 
-確認分支：
+Confirm the current branch:
 
 ```bash
 git status --short --branch
 ```
 
-預期會看到：
+Expected output:
 
 ```text
 ## imu-retarget...origin/imu-retarget
 ```
 
-## 2. 啟動 conda env
+## 2. Activate the Conda Environment
 
-如果 `conda` shell integration 已啟用：
+If conda shell integration is already enabled:
 
 ```bash
 conda activate hsretargeting
 ```
 
-如果你的 shell 找不到 `conda activate`：
+If your shell cannot find `conda activate`:
 
 ```bash
 source /Users/yanglin/.holosoma_deps/miniconda3/etc/profile.d/conda.sh
 conda activate hsretargeting
 ```
 
-進入 wearable IMU workspace：
+Enter the wearable IMU workspace:
 
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
 ```
 
-快速確認 Python package：
+Quick dependency check:
 
 ```bash
 python -c "import numpy, scipy, mujoco, zmq, matplotlib; print('deps ok')"
 ```
 
-如果缺 package，先試：
+If a package is missing, try:
 
 ```bash
 python -m pip install numpy scipy matplotlib mujoco pyzmq pytest
 ```
 
-或用環境檔更新：
+Or update from the environment file:
 
 ```bash
 conda env update -f env/environment.yml
 ```
 
-## 3. 可用資料
+## 3. Available Input Data
 
-目前常用 input：
+Common input files:
 
 ```bash
 ../data/human_joint_clip_20260601_231345.npz
@@ -78,17 +78,18 @@ conda env update -f env/environment.yml
 ../data/smplh_capture_3.jsonl
 ```
 
-`.npz` 是 IMU handoff style 的 9-joint position clip。`.jsonl` 是 camera
-SMPL-H lower-body capture，loader 會轉成同一個 9-joint handoff layout：
+The `.npz` files are IMU handoff-style 9-joint position clips. The `.jsonl`
+file is a camera SMPL-H lower-body capture. The loader converts both formats
+into the same 9-joint handoff layout:
 
 ```text
 Spine1, LeftUpLeg, LeftLeg, LeftFoot, LeftToeBase,
 RightUpLeg, RightLeg, RightFoot, RightToeBase
 ```
 
-## 4. Base Motion 選項
+## 4. Base Motion Modes
 
-recorded replay 和 ZMQ mock-live 都支援：
+Recorded replay and ZMQ mock-live support:
 
 ```bash
 --base-motion root_xy
@@ -96,27 +97,33 @@ recorded replay 和 ZMQ mock-live 都支援：
 --base-motion root_xyz
 ```
 
-含義：
+Meaning:
 
 ```text
-root_xy  : 使用 input root/pelvis 的水平位移，讓 MuJoCo freejoint 在地板上移動。建議預設。
-fixed    : base 固定，只看腿部 retargeting，robot 會原地走。
-root_xyz : 使用 root/pelvis 的 x/y/z 位移；只有 source 的 z motion 可信時才用。
+root_xy  : Use input root/pelvis horizontal displacement to move the MuJoCo freejoint across the floor. Recommended default.
+fixed    : Keep the base fixed and only inspect leg retargeting. The robot walks in place.
+root_xyz : Use input root/pelvis x/y/z displacement. Only use this if the source has reliable vertical root motion.
 ```
 
-注意：human frame 是 `+X forward, +Y left, +Z up`，ch_robot/MuJoCo frame
-是 `+Y forward, +X right, +Z up`。程式已經會把 root translation 轉到
-ch_robot/MuJoCo frame。
+Frame convention:
 
-## 5. 離線 MuJoCo visualization：camera JSONL
+```text
+Human frame         : +X forward, +Y left,  +Z up
+ch_robot/MuJoCo    : +Y forward, +X right, +Z up
+```
 
-先做 no-window smoke test：
+The code already converts root translation from the human frame into the
+ch_robot/MuJoCo frame.
+
+## 5. Offline MuJoCo Visualization: Camera JSONL
+
+First run a no-window smoke test:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
 ```
 
-預期 summary 類似：
+Expected summary:
 
 ```text
 source     : smplh_camera_jsonl
@@ -128,76 +135,77 @@ MuJoCo nq  : 17
 MuJoCo nu  : 10
 ```
 
-開 MuJoCo viewer：
+Open the MuJoCo viewer:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
 ```
 
-macOS 上 MuJoCo passive viewer 需要 `mjpython`。目前 script 會自動用
-`mjpython` relaunch；如果你仍看到 `launch_passive requires mjpython`，
-直接跑：
+On macOS, MuJoCo passive viewer needs `mjpython`. The script should relaunch
+itself with `mjpython` automatically. If you still see
+`launch_passive requires mjpython`, run:
 
 ```bash
 mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
 ```
 
-## 6. 離線 MuJoCo visualization：recorded IMU NPZ
+## 6. Offline MuJoCo Visualization: Recorded IMU NPZ
 
-no-window smoke test：
+No-window smoke test:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --no-show --base-motion root_xy
 ```
 
-開 viewer：
+Open the viewer:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
 ```
 
-如果你只想看 in-place leg motion：
+If you only want in-place leg motion:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion fixed
 ```
 
-調播放速度：
+Change playback speed:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 0.5
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 2.0
 ```
 
-不 loop：
+Disable looping:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --no-loop
 ```
 
-## 7. Matplotlib retargeting debug view
+## 7. Matplotlib Retargeting Debug View
 
-這個不開 MuJoCo，只看 human skeleton 和輸出的 ch_robot joint angles。
+This path does not open MuJoCo. It visualizes the human skeleton and shows the
+resulting ch_robot joint angles.
 
-Camera JSONL：
+Camera JSONL:
 
 ```bash
 python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --base-motion root_xy
 ```
 
-IMU NPZ：
+IMU NPZ:
 
 ```bash
 python demos/demo_replay_ch_robot_retarget.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
 ```
 
-只轉換並印 summary：
+Convert only and print a summary:
 
 ```bash
 python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
 ```
 
-把 qpos/qvel 存成 replay NPZ：
+Save the converted `qpos`/`qvel` as a replay NPZ:
 
 ```bash
 python demos/demo_replay_ch_robot_retarget.py \
@@ -206,19 +214,19 @@ python demos/demo_replay_ch_robot_retarget.py \
   --save-output ../data/ch_robot_replay_qpos_smplh_capture_3.npz
 ```
 
-再用 MuJoCo replay 讀存好的 qpos：
+Replay the saved `qpos`/`qvel` in MuJoCo:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_smplh_capture_3.npz
 ```
 
-## 8. 50 Hz ZMQ mock-live：camera JSONL
+## 8. 50 Hz ZMQ Mock-Live: Camera JSONL
 
-這是最接近 live 的 recorded-data path：publisher 用 50 Hz 餵每幀 9-joint
-position，subscriber 每收到一幀就立刻 retarget 成 ch_robot qpos/qvel，並更新
-MuJoCo。
+This is the closest recorded-data path to live operation. The publisher sends
+each 9-joint position frame at 50 Hz. The subscriber retargets every incoming
+frame into ch_robot `qpos`/`qvel` and updates MuJoCo online.
 
-Terminal 1：啟動 MuJoCo ZMQ subscriber。
+Terminal 1: start the MuJoCo ZMQ subscriber.
 
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
@@ -226,7 +234,7 @@ conda activate hsretargeting
 python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy
 ```
 
-Terminal 2：啟動 50 Hz publisher。
+Terminal 2: start the 50 Hz publisher.
 
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
@@ -234,9 +242,9 @@ conda activate hsretargeting
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --endpoint tcp://127.0.0.1:5556 --fps 50
 ```
 
-如果要只做 no-window smoke test：
+No-window smoke test:
 
-Terminal 1：
+Terminal 1:
 
 ```bash
 python demos/demo_mujoco_ch_robot_zmq.py \
@@ -247,7 +255,7 @@ python demos/demo_mujoco_ch_robot_zmq.py \
   --base-motion root_xy
 ```
 
-Terminal 2：
+Terminal 2:
 
 ```bash
 python demos/demo_zmq_human_joint_publisher.py \
@@ -260,7 +268,7 @@ python demos/demo_zmq_human_joint_publisher.py \
   --status-every 1
 ```
 
-預期 subscriber 會印：
+Expected subscriber output:
 
 ```text
 base     : root_xy
@@ -270,15 +278,15 @@ received=10 frame=9
 Converted 10 ZMQ frames.
 ```
 
-## 9. 50 Hz ZMQ mock-live：recorded IMU NPZ
+## 9. 50 Hz ZMQ Mock-Live: Recorded IMU NPZ
 
-Terminal 1：
+Terminal 1:
 
 ```bash
 python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy
 ```
 
-Terminal 2：
+Terminal 2:
 
 ```bash
 python demos/demo_zmq_human_joint_publisher.py \
@@ -287,26 +295,27 @@ python demos/demo_zmq_human_joint_publisher.py \
   --fps 50
 ```
 
-## 10. 真實 IMU live retargeting
+## 10. Real IMU Live Retargeting
 
-真實 ESP32/BNO085 IMU live path 目前是 orientation-only。它可以即時輸出
-joint rotations -> ch_robot qpos/qvel，但沒有全域 root/pelvis position，所以
-freejoint base 目前會固定；這不是 ZMQ mock-live 的限制，而是 sensor input 沒有
-translation source。
+The real ESP32/BNO085 IMU live path is currently orientation-only. It can emit
+live joint rotations retargeted into ch_robot `qpos`/`qvel`, but it does not
+have global root/pelvis position. That means the MuJoCo freejoint base remains
+fixed for this direct IMU path. This is not a ZMQ mock-live limitation; it is a
+sensor-input limitation.
 
-如果你只要 live qpos/qvel JSON lines：
+Live `qpos`/`qvel` JSON lines:
 
 ```bash
 python demos/demo_live_retarget.py --config shanks --output stdout --fps 100
 ```
 
-full 7-IMU config：
+Full 7-IMU config:
 
 ```bash
 python demos/demo_live_retarget.py --config full --output stdout --fps 100
 ```
 
-送到 UDP downstream process：
+Send live retargeted frames to a UDP downstream process:
 
 ```bash
 python demos/demo_live_retarget.py \
@@ -317,30 +326,30 @@ python demos/demo_live_retarget.py \
   --fps 100
 ```
 
-跳過 calibration：
+Skip calibration:
 
 ```bash
 python demos/demo_live_retarget.py --config shanks --output stdout --fps 100 --no-calibration
 ```
 
-如果要讓真實 live 也像 mock-live 一樣在 MuJoCo 地板上移動，需要額外 live
-root-position source，例如 camera SMPL-H、VIO、mocap、或 foot odometry。接上後
-應使用同一套 base motion policy：
+To make real live retargeting move across the MuJoCo floor like mock-live, add
+a separate live root-position source, such as camera SMPL-H, VIO, mocap, or
+foot odometry. Once that source exists, use the same base motion policy:
 
 ```text
 root_position_source -> base_position_from_joint_points(...) or equivalent
 -> legposes_to_qpos(..., base_position=...)
 ```
 
-## 11. Demo launcher
+## 11. Demo Launcher
 
-如果你想用 GUI launcher：
+Open the GUI launcher:
 
 ```bash
 python demos/demo_launcher.py
 ```
 
-常用項目：
+Common launcher entries:
 
 ```text
 Replay ch_robot Retarget  : Matplotlib skeleton + joint-angle debug
@@ -350,36 +359,38 @@ MuJoCo ch_robot ZMQ       : mock-live subscriber + MuJoCo viewer
 Live ch_robot Retarget    : real ESP32 IMU orientation-only bridge
 ```
 
-對 replay / MuJoCo / ZMQ subscriber，launcher 右側有 `Base motion`：
+For replay, MuJoCo replay, and ZMQ subscriber entries, the launcher exposes a
+`Base motion` option:
 
 ```text
 root_xy, fixed, root_xyz
 ```
 
-## 12. Model cache and floor
+## 12. Model Cache and Floor
 
-`demo_mujoco_ch_robot_replay.py` 和 `demo_mujoco_ch_robot_zmq.py` 會從
-`origin/retargeting_holosoma` 抽出 ch_robot MJCF 和 meshes 到：
+`demo_mujoco_ch_robot_replay.py` and `demo_mujoco_ch_robot_zmq.py` extract the
+ch_robot MJCF and meshes from `origin/retargeting_holosoma` into:
 
 ```bash
 wearable_imu/.cache/ch_robot_model
 ```
 
-第一次執行會自動建立 cache。若要重新抽取 model：
+The cache is created automatically on first run. To force re-extraction:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --refresh-model
 ```
 
-MuJoCo XML cache 會自動加入 checker floor。如果你想確認 XML：
+The cached MuJoCo XML is automatically patched with a checker floor. To inspect
+the cached XML:
 
 ```bash
 python -c "from pathlib import Path; print(Path('.cache/ch_robot_model/ch_robot_10dof.xml').read_text()[:1000])"
 ```
 
-## 13. Validation commands
+## 13. Validation Commands
 
-語法檢查：
+Syntax check:
 
 ```bash
 python -m py_compile \
@@ -391,25 +402,25 @@ python -m py_compile \
   ik/__init__.py
 ```
 
-retargeting tests：
+Retargeting tests:
 
 ```bash
 python -m pytest tests/test_ch_robot_retarget.py -q
 ```
 
-完整 wearable_imu tests：
+Full wearable_imu test suite:
 
 ```bash
 python -m pytest -q
 ```
 
-MuJoCo no-window smoke：
+MuJoCo no-window smoke test:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
 ```
 
-ZMQ no-window smoke，Terminal 1：
+ZMQ no-window smoke test, Terminal 1:
 
 ```bash
 python demos/demo_mujoco_ch_robot_zmq.py \
@@ -420,7 +431,7 @@ python demos/demo_mujoco_ch_robot_zmq.py \
   --base-motion root_xy
 ```
 
-ZMQ no-window smoke，Terminal 2：
+ZMQ no-window smoke test, Terminal 2:
 
 ```bash
 python demos/demo_zmq_human_joint_publisher.py \
@@ -437,88 +448,90 @@ python demos/demo_zmq_human_joint_publisher.py \
 
 ### `launch_passive requires mjpython`
 
-在 macOS 上直接用：
+On macOS, run the viewer with `mjpython`:
 
 ```bash
 mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
 ```
 
-或 ZMQ subscriber：
+For the ZMQ subscriber:
 
 ```bash
 mjpython demos/demo_mujoco_ch_robot_zmq.py --base-motion root_xy
 ```
 
-### Robot 仍然原地走
+### The Robot Still Walks in Place
 
-確認你不是用 fixed base：
+Confirm you are not using fixed base motion:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
 ```
 
-summary 應該包含：
+The summary should include:
 
 ```text
 base motion: root_xy
 ```
 
-若 input 本身 root/pelvis 沒有移動，`root_xy` 也不會讓 robot 移動。可以先看
-camera / IMU data 的 root displacement 是否存在。
+If the input root/pelvis itself does not move, `root_xy` cannot move the robot.
+Check whether the camera or IMU data contains root displacement.
 
-### ZMQ publisher bind error
+### ZMQ Publisher Bind Error
 
-如果看到：
+If you see:
 
 ```text
 zmq.error.ZMQError: Operation not permitted
 ```
 
-通常是 sandbox / local TCP 權限問題。你在自己的 terminal 直接跑通常不會有這個
-限制。也可以換 port：
+This is usually a sandbox or local TCP permission issue. Running the same
+commands in your own terminal should normally avoid the restriction. You can
+also use a different port:
 
 ```bash
 python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5570 --base-motion root_xy
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --endpoint tcp://127.0.0.1:5570 --fps 50
 ```
 
-### ZMQ subscriber 沒收到 frame
+### ZMQ Subscriber Receives No Frames
 
-先開 subscriber，再開 publisher。確認兩邊 endpoint 完全一樣：
+Start the subscriber first, then start the publisher. Confirm both terminals
+use exactly the same endpoint:
 
 ```bash
 tcp://127.0.0.1:5556
 ```
 
-也可用 no-window 版本確認：
+You can also verify with the no-window path:
 
 ```bash
 python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5565 --no-show --max-frames 10 --status-every 1 --base-motion root_xy
 ```
 
-### MuJoCo model cache 壞掉或沒有 floor
+### MuJoCo Model Cache Is Broken or Floor Is Missing
 
-重新抽取 model：
+Re-extract the model:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --refresh-model --base-motion root_xy
 ```
 
-### Import 找不到 `ik`
+### Import Cannot Find `ik`
 
-請從 `wearable_imu/` 目錄跑：
+Run from the `wearable_imu/` directory:
 
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
 python -m pytest tests/test_ch_robot_retarget.py -q
 ```
 
-不要從 repo root 直接跑 `wearable_imu/tests/...`，除非你手動設定
-`PYTHONPATH`。
+Do not run `wearable_imu/tests/...` directly from the repo root unless you set
+`PYTHONPATH` manually.
 
-## 15. Recommended workflow
+## 15. Recommended Workflow
 
-每天開始先跑：
+At the start of a session:
 
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop"
@@ -530,19 +543,19 @@ cd wearable_imu
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
 ```
 
-如果 no-show 通過，再開 visualization：
+If the no-window check passes, open visualization:
 
 ```bash
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
 ```
 
-如果要測「像 live 一樣」的 pipeline：
+To test the live-like pipeline:
 
 ```bash
 python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy
 ```
 
-另一個 terminal：
+In another terminal:
 
 ```bash
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --endpoint tcp://127.0.0.1:5556 --fps 50
