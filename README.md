@@ -18,17 +18,17 @@ Wearable IMUs / RGB-D camera
 
 ## Repository Organization
 
-| Path | Purpose |
-|---|---|
-| `wearable_imu/` | Real-world BNO085 + ESP32-S3 IMU pipeline, UDP packets, calibration, filtering, IK, tests, and demos. |
-| `perception/depth_camera/` | Intel RealSense D435 + MediaPipe pose-estimation baseline. |
-| `retargeting/` | Triton humanoid retargeting contract, `ch_robot` joint order, and Holosoma patch notes. |
-| `simulation/` | Pointer to the dedicated Isaac Lab training repository and pinned simulation commit. |
-| `data/retargeting_samples/` | Small sample retargeting captures used for pipeline validation. |
-| `data/retargeting_experiments/` | Curated small experiment outputs that verify retargeting and conversion contracts. |
-| `docs/` | Project overview, architecture, setup notes, migration notes, and internal planning documents. |
-| `reports/` | CSE 145/237D reports, milestone material, presentations, and final deliverables. |
-| `media/` | Demo videos, screenshots, and images for the project page and final presentation. |
+| Path                            | Purpose                                                                                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `wearable_imu/`                 | Real-world BNO085 + ESP32-S3 IMU pipeline, UDP packets, calibration, filtering, IK, tests, and demos. |
+| `perception/depth_camera/`      | Intel RealSense D435 + MediaPipe pose-estimation baseline.                                            |
+| `retargeting/`                  | Triton humanoid retargeting contract, `ch_robot` joint order, and Holosoma patch notes.               |
+| `simulation/`                   | Pointer to the dedicated Isaac Lab training repository and pinned simulation commit.                  |
+| `data/retargeting_samples/`     | Small sample retargeting captures used for pipeline validation.                                       |
+| `data/retargeting_experiments/` | Curated small experiment outputs that verify retargeting and conversion contracts.                    |
+| `docs/`                         | Project overview, architecture, setup notes, migration notes, and internal planning documents.        |
+| `reports/`                      | CSE 145/237D reports, milestone material, presentations, and final deliverables.                      |
+| `media/`                        | Demo videos, screenshots, and images for the project page and final presentation.                     |
 
 ## Current Status
 
@@ -54,14 +54,14 @@ Each subsystem has its own setup notes — start there if you're new to a compon
 
 Triton Droids, UC San Diego.
 
-| Name | Role | Focus |
-|---|---|---|
-| Darin Djapri | Team Lead | ML/RL, policy & reward design, IsaacLab simulation, sim-to-real |
-| Fong-Yu (Yang) Lin | ML Engineer | RL, policy & reward functions, Sim2Sim (IsaacLab → MuJoCo), data pipeline |
-| Cindy Chen | ML Engineer | Human pose extraction, 3D keypoint retargeting, Holosoma pipeline |
-| Parth Trivedi | Embedded Engineer | IMU + ESP32 hardware, Jetson integration, depth estimation baseline |
-| Neal Jian | Embedded Engineer | ESP32 firmware, UART/wireless pipeline, IK from quaternions, battery design |
-| Tauhid Malik | Embedded Engineer | IMU aggregation pipeline, Jetson networking, hardware bring-up |
+| Name               | Role              | Focus                                                                       |
+| ------------------ | ----------------- | --------------------------------------------------------------------------- |
+| Darin Djapri       | Team Lead         | ML/RL, policy & reward design, IsaacLab simulation, sim-to-real             |
+| Fong-Yu (Yang) Lin | ML Engineer       | RL, policy & reward functions, Sim2Sim (IsaacLab → MuJoCo), data pipeline   |
+| Cindy Chen         | ML Engineer       | Human pose extraction, 3D keypoint retargeting, Holosoma pipeline           |
+| Parth Trivedi      | Embedded Engineer | IMU + ESP32 hardware, Jetson integration, depth estimation baseline         |
+| Neal Jian          | Embedded Engineer | ESP32 firmware, UART/wireless pipeline, IK from quaternions, battery design |
+| Tauhid Malik       | Embedded Engineer | IMU aggregation pipeline, Jetson networking, hardware bring-up              |
 
 ## CSE 145/237D Materials
 
@@ -70,9 +70,3 @@ Course-facing deliverables are collected under [`reports/`](reports/):
 - Milestone report: [`reports/milestone_report.md`](reports/milestone_report.md)
 - Presentations: [`reports/presentations/`](reports/presentations/)
 - Demo media: [`media/`](media/)
-
-## Artifact Policy
-
-We don't commit training checkpoints, TensorBoard logs, generated Hydra outputs, large raw captures, or third-party source drops directly to the main branch. Use GitHub Releases, external storage, or a clearly documented private artifact location, then link them from `reports/` or `docs/`.
-
-See [`docs/artifact-policy.md`](docs/artifact-policy.md).
