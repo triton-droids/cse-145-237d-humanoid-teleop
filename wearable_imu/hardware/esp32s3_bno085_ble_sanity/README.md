@@ -1,9 +1,9 @@
 # ESP32-S3 BNO085 BLE Sanity Check
 
-Use this when Wi-Fi is unavailable. It keeps the same BNO085 full UART wiring as
+We use this when Wi-Fi is unavailable. It keeps the same BNO085 full UART wiring as
 the UDP firmware, but sends quaternion text notifications over BLE.
 
-This is a test path, not the main 7-sensor architecture.
+This is a test path, not our main 7-sensor architecture.
 
 ## Wiring
 

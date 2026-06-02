@@ -1,5 +1,5 @@
 # Media
 
-Place project images and demo videos here when they are small enough for GitHub.
+We place project images and demo videos here when they're small enough for GitHub.
 
-For larger videos, use GitHub Releases or external storage and link them from the main `README.md` or `reports/`.
+For larger videos, we use GitHub Releases or external storage and link them from the main `README.md` or `reports/`.

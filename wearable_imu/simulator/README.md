@@ -1,8 +1,8 @@
 # Simulator Workflow
 
-This folder is now an archived/supporting simulation harness.
+We've archived the MuJoCo simulator as a supporting harness.
 
-MuJoCo is useful for:
+MuJoCo is still useful for:
 
 - visualizing the current lower-body model
 - generating clean synthetic IMU quaternions
@@ -10,8 +10,8 @@ MuJoCo is useful for:
 - injecting fake strap/mount errors later
 - regression testing estimator behavior
 
-It is not the main product workflow anymore. Real-world calibration and BNO085
-quaternion handling should live in `hardware/`, `sensor/`, and `calibration/`.
+It's no longer our main workflow. Real-world calibration and BNO085 quaternion
+handling live in `hardware/`, `sensor/`, and `calibration/`.
 
 Simulation should follow the same packet assumptions as hardware whenever data
 leaves the simulator:

@@ -1,6 +1,6 @@
 # Replication Guide
 
-This guide gives the high-level steps needed to reproduce the project.
+Here are the high-level steps to reproduce our project.
 
 ## Hardware
 
@@ -41,7 +41,7 @@ inspect depth-backed landmark coordinates
 
 ## Isaac Lab Simulation
 
-See [`../simulation/README.md`](../simulation/README.md), then follow the README in the dedicated simulation repository:
+See [`../simulation/README.md`](../simulation/README.md), then follow the README in our dedicated simulation repository:
 
 https://github.com/triton-droids/simulation
 
@@ -71,7 +71,7 @@ validate joint_pos width 17 and joint_vel width 16
 
 ## Reports and Media
 
-Class reports, presentation files, and demo videos should be placed under:
+We place class reports, presentation files, and demo videos under:
 
 - `reports/`
 - `reports/presentations/`

@@ -1,13 +1,13 @@
 # Real-World Lower-Body IMU Pose Estimation
 
 ## Goal
-Build a real-time lower-body pose estimator for wearable IMUs.
+Our goal: build a real-time lower-body pose estimator using wearable IMUs.
 
 Source branch history:
 [`inverse-kinematics`](https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/inverse-kinematics).
 See [`source-branch.md`](source-branch.md) for the branch-to-folder mapping.
 
-The target hardware path is:
+Our target hardware path is:
 
 ```text
 BNO085 quaternion streams on the active ESP32-S3 nodes
@@ -20,8 +20,8 @@ BNO085 quaternion streams on the active ESP32-S3 nodes
     -> visualization and evaluation
 ```
 
-MuJoCo is now a supporting tool, not the center of the project. It remains useful
-as a synthetic test harness for fake IMU data, but the main workflow is the
+We use MuJoCo as a supporting tool, not the center of the project. It remains useful
+as a synthetic test harness for fake IMU data, but our main workflow is the
 real-world wearable pipeline.
 
 ## Current Sensor Assumption
@@ -29,7 +29,7 @@ The BNO085 provides fused orientation quaternions directly. Our current input
 contract is therefore quaternion packets, not raw accel/gyro fusion.
 
 Each ESP32-S3 streams directly to the Jetson over UDP. The pelvis ESP32 is not
-the hub in the first architecture; it is just another sensor node.
+the hub in our first architecture; it is just another sensor node.
 
 Expected packet shape:
 
@@ -46,7 +46,7 @@ QuaternionPacket:
     report_type
 ```
 
-Current packet format is a 40-byte little-endian binary UDP payload with `IMUQ`
+Our current packet format is a 40-byte little-endian binary UDP payload with `IMUQ`
 magic and `wxyz` quaternion order.
 
 Identity rules:
@@ -69,12 +69,12 @@ Segment IDs:
 255 unknown
 ```
 
-The software contract supports the full seven-segment lower-body set. The
+Our software contract supports the full seven-segment lower-body set. The
 current hardware MVP can run with a five-node subset while still using the same
 packet format and segment IDs.
 
 ## Wearable Placement
-Default placement for the lower-body setup:
+Default placement for our lower-body setup:
 
 - pelvis: front center, around belt line
 - thigh: lateral/outside thigh, around mid-thigh
@@ -129,7 +129,7 @@ CalibrationProfile:
 | `env/` | Environment setup | Conda environment definition |
 
 ## Current Useful Commands
-Because local shell activation has been unreliable, prefer `conda run`:
+Because local shell activation has been unreliable, we prefer `conda run`:
 
 ```powershell
 conda run -p .\.conda python -m pytest -q
@@ -148,7 +148,7 @@ conda run -p .\.conda python demos\demo_imu_orientation_ik.py
 ```
 
 ## Development Direction
-The next real work should happen in this order:
+Here is our planned development order:
 
 ```text
 1. flash one ESP32-S3/BNO085 node and receive UDP packets on the Jetson
@@ -162,12 +162,12 @@ The next real work should happen in this order:
 8. keep MuJoCo only as a fake-data generator and regression harness
 ```
 
-The guiding rule: the estimator should be designed for messy straps and real
-people first, then tested with simulation as a convenience.
+Our guiding rule: design the estimator for messy straps and real people first,
+then use simulation as a sanity check.
 
 ## Current Real-World Pipeline Code
 
-Implemented so far:
+What we've implemented so far:
 
 - ESP32-S3/BNO085 UDP packet firmware scaffold
 - Jetson-side binary quaternion packet parser
@@ -176,7 +176,7 @@ Implemented so far:
 - SLERP smoothing
 - neutral standing calibration profile from quaternion samples
 
-Not implemented yet:
+What's still on our list:
 
 - thigh/shank heading alignment
 - functional knee-hinge calibration

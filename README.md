@@ -4,9 +4,9 @@ Wearable lower-body motion capture and simulation-based policy training for huma
 
 ## Abstract
 
-This project builds a humanoid teleoperation pipeline that lets a humanoid robot imitate lower-body human motion. The system combines wearable IMU nodes, a depth-camera perception baseline, calibration and inverse kinematics, retargeting to the Triton humanoid model, and reinforcement-learning simulation in Isaac Lab.
+We built a humanoid teleoperation pipeline that lets a humanoid robot imitate lower-body human motion. Our system combines wearable IMU nodes, a depth-camera perception baseline, calibration and inverse kinematics, retargeting to the Triton humanoid model, and reinforcement-learning simulation in Isaac Lab.
 
-The target pipeline is:
+Our pipeline is:
 
 ```text
 Wearable IMUs / RGB-D camera
@@ -37,12 +37,12 @@ Wearable IMUs / RGB-D camera
 - Lower-body orientation IK and MuJoCo synthetic test harness exist for validation.
 - RealSense D435 + MediaPipe baseline estimates depth-backed pose landmarks.
 - Triton humanoid retargeting contract and CH robot Holosoma converter patch are documented.
-- Isaac Lab humanoid locomotion simulation exists and is being extended toward motion tracking.
+- Isaac Lab humanoid locomotion simulation is running and we are extending it toward motion tracking.
 - Final sim-to-real deployment is still in progress.
 
 ## Quick Start
 
-Each subsystem has its own setup notes:
+Each subsystem has its own setup notes — start there if you're new to a component:
 
 - Wearable IMU pipeline: [`wearable_imu/README.md`](wearable_imu/README.md)
 - Depth-camera baseline: [`perception/depth_camera/README.md`](perception/depth_camera/README.md)
@@ -73,6 +73,6 @@ Course-facing deliverables are collected under [`reports/`](reports/):
 
 ## Artifact Policy
 
-Training checkpoints, TensorBoard logs, generated Hydra outputs, large raw captures, and third-party source drops should not be committed directly to the main branch. Use GitHub Releases, external storage, or a clearly documented private artifact location, then link them from `reports/` or `docs/`.
+We don't commit training checkpoints, TensorBoard logs, generated Hydra outputs, large raw captures, or third-party source drops directly to the main branch. Use GitHub Releases, external storage, or a clearly documented private artifact location, then link them from `reports/` or `docs/`.
 
 See [`docs/artifact-policy.md`](docs/artifact-policy.md).

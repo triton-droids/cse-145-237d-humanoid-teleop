@@ -1,6 +1,6 @@
 # ESP32-S3 BNO085 UART Sanity Check
 
-Use this after the board LED sanity check and before UDP streaming.
+We run this after the board LED sanity check and before UDP streaming.
 
 This sketch verifies:
 

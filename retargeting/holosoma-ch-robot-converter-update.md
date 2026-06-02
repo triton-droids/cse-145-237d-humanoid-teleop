@@ -2,9 +2,9 @@
 
 ## Summary
 
-This update adds `ch_robot` support to the Holosoma retargeting converter and verifies the full pipeline from retargeted motion to IsaacLab/RL tracking data.
+We added `ch_robot` support to the Holosoma retargeting converter and verified the full pipeline from retargeted motion to IsaacLab/RL tracking data.
 
-The retargeter output is not the final format consumed by IsaacLab. The retargeter produces a compact motion file with:
+The retargeter output is not the final format consumed by IsaacLab. Our retargeter produces a compact motion file with:
 
 ```text
 qpos
@@ -37,7 +37,7 @@ fps
 
 ### Added ch_robot joint order
 
-The converter now has a default joint order for `ch_robot`:
+We added a default joint order for `ch_robot` to the converter:
 
 ```python
 "ch_robot": [
@@ -58,7 +58,7 @@ This is required so the converter can map retargeted `qpos[:, 7:]` values into t
 
 ### Removed the hardcoded G1 DOF assumption
 
-The converter previously sliced robot joint positions with:
+Previously, the converter sliced robot joint positions with:
 
 ```python
 motion[:, 7:36]
@@ -70,7 +70,7 @@ That assumes a 29-DOF robot and only works for G1:
 36 - 7 = 29
 ```
 
-`ch_robot` has 10 DOF, so the converter now slices based on the selected robot's joint count:
+`ch_robot` has 10 DOF, so we updated the converter to slice based on the selected robot's joint count:
 
 ```python
 motion[:, 7 : 7 + robot_dof]
@@ -90,11 +90,11 @@ The retargeted `.npz` stores `fps` as an FPS value, for example:
 fps = 30
 ```
 
-The converter now handles FPS values like `30` correctly instead of treating them as timestep-like values.
+We updated the converter to handle FPS values like `30` correctly instead of treating them as timestep-like values.
 
 ### Added headless conversion
 
-The converter now supports:
+We added `--headless` support:
 
 ```bash
 --headless
@@ -104,13 +104,13 @@ This allows batch conversion without launching the MuJoCo viewer. The converter 
 
 ### Fixed setup scripts for paths with spaces
 
-The local workspace path contains a space:
+Our local workspace path contains a space:
 
 ```text
 Triton Droids
 ```
 
-Some setup scripts used unquoted shell variables, which broke path resolution. Path variables were quoted in:
+Some setup scripts used unquoted shell variables, which broke path resolution. We quoted path variables in:
 
 ```text
 scripts/setup_retargeting.sh
@@ -123,7 +123,7 @@ We tested the update with both synthetic data and real processed OMOMO data.
 
 ### Synthetic test
 
-The synthetic test produced a valid retargeted `ch_robot` file:
+Our synthetic test produced a valid retargeted `ch_robot` file:
 
 ```text
 demo_results/ch_robot/minimal/tiny_stand.npz
@@ -160,7 +160,7 @@ fps: [50]
 
 ### Real OMOMO test
 
-The processed OMOMO dataset was downloaded as:
+We downloaded the processed OMOMO dataset as:
 
 ```text
 OMOMO_new.zip

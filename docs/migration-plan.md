@@ -1,6 +1,6 @@
 # Migration Plan
 
-This repository consolidates work that was previously split across multiple branches and repositories.
+We consolidated work that was previously split across multiple branches and repositories into this single course-project repository.
 
 ## Source Mapping
 

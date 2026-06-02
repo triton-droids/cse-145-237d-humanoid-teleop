@@ -1,6 +1,6 @@
 ## GOALS
 
-Project explanations in under seven words: Teleoperate Humanoid to imitate human pose
+Our project in under seven words: Teleoperate Humanoid to imitate human pose
 
 Embedded device OR camera OR existing motion data
 
@@ -48,7 +48,7 @@ Note: While waiting for the embedded team to finish, we can attempt to train a c
 
 Extra note: All of the above will be converted to github issues for our project tracking along with timelines.
 
-## Entire Project Top-Down
+## Our Project Top-Down
 
 Embedded \-\> Pose Estimation \-\> Retargeting \-\> RL Training \-\> Sim2Sim \-\> Sim2Real
 
@@ -110,7 +110,7 @@ ML:
 5. (Yang, Darin) sim2real  
    1. Deploy it to actual robot
 
-## Project Hardware Requirements:
+## Our Hardware Requirements:
 
 - 
 

@@ -1,6 +1,6 @@
 # Test Workflow
 
-This folder contains verification checks.
+This folder contains our verification checks.
 
 Current tests cover:
 
@@ -13,7 +13,7 @@ Current tests cover:
 - lower-body geometry assumptions
 - MuJoCo model loading and viewer helper outputs
 
-Future tests should focus on:
+We still need tests for:
 
 - UDP receiver buffering and freshness checks
 - neutral calibration repeatability

@@ -1,6 +1,6 @@
 # Data Workflow
 
-This folder stores generated outputs and later recorded captures.
+This folder stores our generated outputs and recorded captures.
 
 Current uses:
 

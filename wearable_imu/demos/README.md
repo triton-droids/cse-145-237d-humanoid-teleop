@@ -1,6 +1,6 @@
 # Demo Workflows
 
-This folder contains runnable scripts that connect multiple modules.
+This folder has runnable scripts we built to connect multiple modules.
 
 Current demos:
 
@@ -22,5 +22,5 @@ Current demos:
 - `demo_mujoco_lower_body_viewer.py`: archived MuJoCo visual harness with fake
   IMU quaternions and live estimator display
 
-Demos are allowed to be practical and integrated. Core logic should still live
-in workflow folders like `sensor/`, `calibration/`, `ik/`, and `simulator/`.
+We keep demos practical and integrated. Core logic stays in workflow folders like
+`sensor/`, `calibration/`, `ik/`, and `simulator/`.

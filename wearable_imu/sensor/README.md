@@ -1,6 +1,6 @@
 # Sensor Workflow
 
-This folder owns the data contract between hardware/simulation and calibration.
+This folder defines our data contract between hardware/simulation and calibration.
 
 Expected input:
 
@@ -27,12 +27,12 @@ Responsibilities:
 - reject obvious quaternion spikes before calibration
 - smooth accepted orientations with quaternion SLERP
 
-This layer should not estimate joints. It should make sensor data boring and
+This layer doesn't estimate joints. Its job is to make sensor data boring and
 consistent before calibration sees it.
 
 ## Current Binary UDP Contract
 
-The first ESP32 firmware sends one 40-byte little-endian packet per quaternion:
+Our first ESP32 firmware sends one 40-byte little-endian packet per quaternion:
 
 ```text
 magic[4]          "IMUQ"

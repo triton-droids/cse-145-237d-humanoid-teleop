@@ -1,6 +1,6 @@
 # System Architecture
 
-The project is split into five subsystems.
+We split our project into five subsystems.
 
 ```text
 1. Wearable sensing
@@ -21,14 +21,14 @@ The project is split into five subsystems.
 
 ## Baselines
 
-The depth-camera baseline uses an Intel RealSense D435 and MediaPipe to produce depth-backed body landmarks. This gives the team a non-wearable comparison path while the IMU pipeline is developed.
+Our depth-camera baseline uses an Intel RealSense D435 and MediaPipe to produce depth-backed body landmarks. This gives us a non-wearable comparison path while the IMU pipeline is being developed.
 
 ## Coordinate Contracts
 
-The preferred downstream contract is robot-frame lower-body pose data. Sensor packets should retain timestamps, sensor identity, segment identity, quaternion order, and validity information so the receiver can reject stale or unstable data.
+Our preferred downstream contract is robot-frame lower-body pose data. Sensor packets should retain timestamps, sensor identity, segment identity, quaternion order, and validity information so the receiver can reject stale or unstable data.
 
 The retargeting output contract is documented in [`../retargeting/README.md`](../retargeting/README.md). For `ch_robot`, compact retargeted `qpos` has 17 dimensions: 7 floating-base values plus 10 robot joint positions.
 
 ## Simulation
 
-Isaac Lab is the main policy-training environment and is maintained in the dedicated `triton-droids/simulation` repository. MuJoCo remains useful for synthetic IMU validation and sim-to-sim checks, but it is not the main training target.
+We use Isaac Lab as our main policy-training environment, maintained in the dedicated `triton-droids/simulation` repository. MuJoCo remains useful for synthetic IMU validation and sim-to-sim checks, but it is not our main training target.

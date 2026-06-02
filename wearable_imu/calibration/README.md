@@ -1,8 +1,8 @@
 # Calibration Workflow
 
-This folder is for turning strapped IMU orientations into segment orientations.
+This folder handles turning strapped IMU orientations into segment orientations.
 
-The real-world issue is that sensors are not perfectly mounted. A thigh or
+Our real-world constraint is that sensors are not perfectly mounted. A thigh or
 shank IMU can rotate around the limb, and the strap may not land the same way
 twice.
 
@@ -26,9 +26,8 @@ slow knee flexion or squat samples
     -> refine strap twist correction
 ```
 
-Saved output should become a `CalibrationProfile` containing neutral
-quaternions, sensor-to-segment rotations, heading corrections, estimated joint
-axes, and user/body dimensions.
+We save a `CalibrationProfile` containing neutral quaternions, sensor-to-segment
+rotations, heading corrections, estimated joint axes, and user/body dimensions.
 
 ## Current Code
 
@@ -43,7 +42,7 @@ Current behavior:
 - record which physical `sensor_id` supplied each segment
 - apply live orientations relative to neutral
 
-This is enough to test the first calibration behavior before hardware arrives.
+This is enough to test our first calibration behavior before hardware arrives.
 
 Identity assumption:
 

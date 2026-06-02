@@ -1,6 +1,6 @@
 # Human Pose Estimation with Intel RealSense D435 and MediaPipe
 
-This folder contains a simple local pose estimation demo for Ubuntu using:
+This folder contains our local pose estimation demo for Ubuntu, built using:
 
 - Python
 - Intel RealSense D435
@@ -106,11 +106,11 @@ rs.align(rs.stream.color)
 
 7. Converts the returned color frame into OpenCV BGR for drawing and into RGB for MediaPipe.
 
-This fallback was added because on this machine the D435 did not accept a `BGR8` request directly and reported that `YUYV` was available.
+We added this fallback because our D435 did not accept a `BGR8` request directly and reported that `YUYV` was available.
 
 ## Depth Information
 
-Yes, the script uses real depth from the D435.
+Yes, we use real depth from the D435.
 
 It does the following:
 

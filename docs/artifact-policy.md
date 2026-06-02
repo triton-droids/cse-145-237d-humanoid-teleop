@@ -1,6 +1,6 @@
 # Artifact Policy
 
-The main branch should remain usable as a project source and documentation repository. Generated or bulky artifacts should be linked, not committed.
+We keep the main branch clean as our project source and documentation hub. Generated or bulky artifacts get linked, not committed.
 
 ## Do Not Commit
 
@@ -26,11 +26,11 @@ The main branch should remain usable as a project source and documentation repos
 
 ## Recommended Hosting
 
-Use GitHub Releases or external storage for:
+We use GitHub Releases or external storage for:
 
 - trained policy checkpoints
 - full demo videos
 - large raw captures
 - full experiment logs
 
-Then document the artifact link in `reports/` or `docs/`.
+We then document the artifact link in `reports/` or `docs/`.

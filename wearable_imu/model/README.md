@@ -1,8 +1,8 @@
 # Body Model Workflow
 
-This folder contains shared body geometry and dimension assumptions.
+This folder contains the shared body geometry and dimension assumptions we use.
 
-It should define:
+We define:
 
 - body segment names
 - segment coordinate frames
@@ -23,6 +23,5 @@ Default segment axes:
 - `+Y` left
 - `+Z` up
 
-Important boundary: quaternions alone do not determine bone lengths. Segment
-lengths should come from manual measurement, user height ratios, or external
-constraints.
+Important: quaternions alone don't determine bone lengths. Segment lengths
+should come from manual measurement, user height ratios, or external constraints.

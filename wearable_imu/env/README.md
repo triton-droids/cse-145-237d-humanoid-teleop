@@ -1,9 +1,9 @@
 # Environment Workflow
 
-This folder owns environment setup.
+This folder handles our environment setup.
 
-The project currently uses Conda. Because shell activation has been unreliable
-on this machine, prefer running commands through the project environment:
+We use Conda. Since shell activation has been unreliable on our machines, we
+prefer running commands through the project environment:
 
 ```powershell
 conda run -p .\.conda python -m pytest -q

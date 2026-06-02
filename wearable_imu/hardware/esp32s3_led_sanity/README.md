@@ -1,6 +1,6 @@
 # ESP32-S3 LED Sanity Check
 
-Use this first to make sure the ESP32-S3 board can flash and run code before
+We use this first to make sure the ESP32-S3 board can flash and run code before
 testing the BNO085.
 
 The sketch cycles the onboard addressable RGB LED on GPIO 38 and prints status
