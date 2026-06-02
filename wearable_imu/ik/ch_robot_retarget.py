@@ -8,9 +8,9 @@ MuJoCo qpos layout used by the ch_robot Holosoma contract:
 It is intentionally a direct geometric projection, not an optimizer.  The
 coordinate mapping below follows the current IMU pipeline convention
 (``+X`` forward, ``+Y`` left, ``+Z`` up) and the ch_robot convention inferred
-from the MJCF (``+Y`` forward, ``+X`` lateral, ``+Z`` up).  If the ch_robot MJCF
-is available, validate signs in the viewer with single-axis poses before using
-this for hardware control.
+from the MJCF (``-Y`` forward, ``+X`` left/lateral, ``+Z`` up).  If the ch_robot
+MJCF is available, validate signs in the viewer with single-axis poses before
+using this for hardware control.
 """
 
 from __future__ import annotations
@@ -116,13 +116,13 @@ JOINT_LIMIT_HIGH = 1.57
 X_AXIS = np.array([1.0, 0.0, 0.0], dtype=np.float64)
 
 # Human: +X forward, +Y left, +Z up.
-# ch_robot: +Y forward, +X lateral/right, +Z up.
-# Mapping: human +X -> robot +Y, human +Y -> robot -X, human +Z -> robot +Z.
+# ch_robot: -Y forward, +X left/lateral, +Z up.
+# Mapping: human +X -> robot -Y, human +Y -> robot +X, human +Z -> robot +Z.
 HUMAN_TO_ROBOT_FRAME = Rotation.from_matrix(
     np.array(
         [
-            [0.0, -1.0, 0.0],
-            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [-1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0],
         ],
         dtype=np.float64,

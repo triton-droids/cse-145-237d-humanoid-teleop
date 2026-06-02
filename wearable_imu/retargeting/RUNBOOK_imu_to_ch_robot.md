@@ -108,8 +108,8 @@ root_xyz : Use input root/pelvis x/y/z displacement. Only use this if the source
 Frame convention:
 
 ```text
-Human frame         : +X forward, +Y left,  +Z up
-ch_robot/MuJoCo    : +Y forward, +X right, +Z up
+Human frame         : +X forward, +Y left, +Z up
+ch_robot/MuJoCo    : -Y forward, +X left, +Z up
 ```
 
 The code already converts root translation from the human frame into the

@@ -206,16 +206,16 @@ def test_root_xy_base_motion_drives_freejoint_translation_and_velocity() -> None
     qpos, qvel = human_joint_clip_to_qpos_qvel(clip, base_motion="root_xy")
 
     np.testing.assert_allclose(qpos[0, :3], [0.0, 0.0, BASE_HEIGHT_M])
-    np.testing.assert_allclose(qpos[1, :3], [0.04, 0.12, BASE_HEIGHT_M])
+    np.testing.assert_allclose(qpos[1, :3], [-0.04, -0.12, BASE_HEIGHT_M])
     np.testing.assert_allclose(qvel[0, :3], [0.0, 0.0, 0.0])
-    np.testing.assert_allclose(qvel[1, :3], [2.0, 6.0, 0.0])
+    np.testing.assert_allclose(qvel[1, :3], [-2.0, -6.0, 0.0])
     np.testing.assert_allclose(
         base_position_from_joint_points(
             points[1],
             root_origin=points[0, 0],
             base_motion="root_xyz",
         ),
-        [0.04, 0.12, BASE_HEIGHT_M + 0.03],
+        [-0.04, -0.12, BASE_HEIGHT_M + 0.03],
     )
 
 
@@ -351,6 +351,9 @@ def test_holosoma_branch_mjcf_contract_matches_live_retargeter() -> None:
 
 
 def test_to_robot_frame_uses_expected_basis_change() -> None:
+    np.testing.assert_allclose(HUMAN_TO_ROBOT_FRAME.apply([0.0, 1.0, 0.0]), [1.0, 0.0, 0.0])
+    np.testing.assert_allclose(HUMAN_TO_ROBOT_FRAME.apply([1.0, 0.0, 0.0]), [0.0, -1.0, 0.0])
+
     human_forward_yaw = Rotation.from_euler("z", np.pi / 2.0)
     robot_rot = to_robot_frame(human_forward_yaw)
 
