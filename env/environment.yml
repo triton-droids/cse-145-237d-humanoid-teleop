@@ -1,18 +1,13 @@
-name: pose-estimation
+name: humanoid-sim
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
   - python=3.11
-  - pinocchio=4.0
   - pip
   - pip:
       - numpy
       - scipy
-      - pandas
       - matplotlib
-      - pydantic
-      - tqdm
-      - pytest
       - mujoco
-      - ahrs
-      - transforms3d
+      - pytest

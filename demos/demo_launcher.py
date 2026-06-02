@@ -24,6 +24,25 @@ ANSI_CLEAR_HOME = "\033[2J\033[H"
 
 
 @dataclass(frozen=True)
+class OptionGroup:
+    """A mutually-exclusive choice exposed as radio buttons on the right panel.
+
+    The selected value is appended to the command as ``flag value`` (e.g.
+    ``--config full``), so one demo entry can cover several variants without
+    cluttering the demo list.
+    """
+
+    key: str
+    label: str
+    flag: str
+    choices: tuple[str, ...]
+    default: str
+
+    def args_for(self, value: str) -> tuple[str, ...]:
+        return (self.flag, value)
+
+
+@dataclass(frozen=True)
 class DemoSpec:
     key: str
     title: str
@@ -32,6 +51,7 @@ class DemoSpec:
     default_args: tuple[str, ...] = ()
     notes: str = ""
     needs_args: bool = False
+    options: tuple[OptionGroup, ...] = ()
 
     def command(self, extra_args: tuple[str, ...] = ()) -> list[str]:
         return [sys.executable, "-u", str(self.script), *self.default_args, *extra_args]
@@ -78,28 +98,21 @@ DEMOS: tuple[DemoSpec, ...] = (
         notes="Requires the MuJoCo Python package and display support.",
     ),
     DemoSpec(
-        key="partial-imu-live-viewer-thighs",
-        title="Partial IMU Viewer - Thighs",
+        key="partial-imu-live-viewer",
+        title="Partial IMU Viewer",
         script=PROJECT_ROOT / "demos" / "demo_partial_imu_live_viewer.py",
-        description="Visualize pelvis plus left/right thigh IMUs with estimated distal segments.",
-        default_args=("--config", "thighs", "--no-prompt-calibration"),
-        notes="Requires pelvis, left_thigh, and right_thigh packets.",
-    ),
-    DemoSpec(
-        key="partial-imu-live-viewer-shanks",
-        title="Partial IMU Viewer - Shanks",
-        script=PROJECT_ROOT / "demos" / "demo_partial_imu_live_viewer.py",
-        description="Visualize pelvis, thighs, and shanks with estimated feet.",
-        default_args=("--config", "shanks", "--no-prompt-calibration"),
-        notes="Requires pelvis, both thighs, and both shanks.",
-    ),
-    DemoSpec(
-        key="partial-imu-live-viewer-full",
-        title="Partial IMU Viewer - Full",
-        script=PROJECT_ROOT / "demos" / "demo_partial_imu_live_viewer.py",
-        description="Visualize the full seven-segment lower-body IMU set.",
-        default_args=("--config", "full", "--no-prompt-calibration"),
-        notes="Requires all seven lower-body segment packets.",
+        description="Live lower-body skeleton from real IMU packets, with estimated distal segments.",
+        default_args=("--no-prompt-calibration",),
+        notes="Pick the IMU set on the right. thighs=3 (pelvis+thighs), shanks=5 (+shanks), full=7.",
+        options=(
+            OptionGroup(
+                key="config",
+                label="IMU set",
+                flag="--config",
+                choices=("thighs", "shanks", "full"),
+                default="thighs",
+            ),
+        ),
     ),
     DemoSpec(
         key="udp-quaternion-receiver",
@@ -165,6 +178,13 @@ class DemoLauncher(tk.Tk):
         style.map("Secondary.TButton", background=[("active", "#d8dfd4"), ("pressed", "#cbd5c7")])
         style.configure("Danger.TButton", background="#ead9d3", foreground="#733221", padding=(14, 8))
         style.map("Danger.TButton", background=[("active", "#dfc9c0"), ("pressed", "#d0b2a8")])
+        # Segmented-control look for per-demo option choices (Toolbutton radios).
+        style.configure("Option.Toolbutton", font=("Avenir Next", 11), padding=(14, 6), background="#e4e8e1", foreground="#243027")
+        style.map(
+            "Option.Toolbutton",
+            background=[("selected", "#23614a"), ("active", "#d8dfd4")],
+            foreground=[("selected", "#ffffff")],
+        )
 
     def _build_ui(self) -> None:
         root = ttk.Frame(self, padding=18, style="Root.TFrame")
@@ -226,8 +246,13 @@ class DemoLauncher(tk.Tk):
         self.notes_label = ttk.Label(details, wraplength=650, justify="left", style="Subtle.TLabel")
         self.notes_label.grid(row=2, column=0, sticky="ew", pady=(6, 0))
 
+        # Per-demo option groups (radio buttons) are rebuilt on demo selection.
+        self.options_frame = ttk.Frame(details, style="Panel.TFrame")
+        self.options_frame.grid(row=3, column=0, sticky="ew", pady=(14, 0))
+        self.option_vars: dict[str, tk.StringVar] = {}
+
         args_frame = ttk.Frame(details, style="Panel.TFrame")
-        args_frame.grid(row=3, column=0, sticky="ew", pady=(14, 0))
+        args_frame.grid(row=4, column=0, sticky="ew", pady=(14, 0))
         args_frame.columnconfigure(1, weight=1)
         ttk.Label(args_frame, text="Extra args", style="Section.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 10))
         args_entry = ttk.Entry(args_frame, textvariable=self.extra_args)
@@ -235,7 +260,7 @@ class DemoLauncher(tk.Tk):
         args_entry.bind("<KeyRelease>", lambda _event: self._refresh_command_label())
 
         button_frame = ttk.Frame(details, style="Panel.TFrame")
-        button_frame.grid(row=4, column=0, sticky="ew", pady=(14, 0))
+        button_frame.grid(row=5, column=0, sticky="ew", pady=(14, 0))
         ttk.Button(button_frame, text="Run Demo", command=self._run_selected_demo, style="Primary.TButton").pack(side="left")
         ttk.Button(button_frame, text="Stop", command=self._stop_process, style="Danger.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Clear Output", command=self._clear_output, style="Secondary.TButton").pack(side="left", padx=(8, 0))
@@ -286,7 +311,45 @@ class DemoLauncher(tk.Tk):
         self.title_label.configure(text=demo.title)
         self.description_label.configure(text=demo.description)
         self.notes_label.configure(text=demo.notes)
+        self._rebuild_options(demo)
         self._refresh_command_label()
+
+    def _rebuild_options(self, demo: DemoSpec) -> None:
+        """Render the selected demo's option groups as segmented radio buttons."""
+        for child in self.options_frame.winfo_children():
+            child.destroy()
+        self.option_vars = {}
+
+        if not demo.options:
+            self.options_frame.grid_remove()
+            return
+        self.options_frame.grid()
+
+        for row, group in enumerate(demo.options):
+            ttk.Label(self.options_frame, text=group.label, style="Section.TLabel").grid(
+                row=row, column=0, sticky="w", padx=(0, 12), pady=(0, 4)
+            )
+            choices = ttk.Frame(self.options_frame, style="Panel.TFrame")
+            choices.grid(row=row, column=1, sticky="w", pady=(0, 4))
+            var = tk.StringVar(value=group.default)
+            self.option_vars[group.key] = var
+            for choice in group.choices:
+                ttk.Radiobutton(
+                    choices,
+                    text=choice,
+                    value=choice,
+                    variable=var,
+                    style="Option.Toolbutton",
+                    command=self._refresh_command_label,
+                ).pack(side="left", padx=(0, 6))
+
+    def _option_args(self, demo: DemoSpec) -> tuple[str, ...]:
+        args: list[str] = []
+        for group in demo.options:
+            var = self.option_vars.get(group.key)
+            if var is not None:
+                args.extend(group.args_for(var.get()))
+        return tuple(args)
 
     def _refresh_command_label(self) -> None:
         demo = self._demo_by_key(self.selected_demo.get())
@@ -295,7 +358,7 @@ class DemoLauncher(tk.Tk):
         except ValueError as exc:
             self.command_label.configure(text=f"Invalid extra args: {exc}")
             return
-        command = demo.command(extra)
+        command = demo.command(self._option_args(demo) + extra)
         relative_command = []
         for index, part in enumerate(command):
             if index == 0:
@@ -323,7 +386,7 @@ class DemoLauncher(tk.Tk):
             messagebox.showerror("Missing argument", f"{demo.title} needs extra args. {demo.notes}")
             return
 
-        command = demo.command(extra)
+        command = demo.command(self._option_args(demo) + extra)
         self.live_frame_buffer = None
         self._append_output(f"\n$ {' '.join(shlex.quote(part) for part in command)}\n", tag="command")
         try:
@@ -463,6 +526,9 @@ def main() -> None:
             default_args = " ".join(demo.default_args)
             suffix = f" [{default_args}]" if default_args else ""
             print(f"{demo.key}: {demo.script.relative_to(PROJECT_ROOT)}{suffix}")
+            for group in demo.options:
+                choices = "|".join(group.choices)
+                print(f"    {group.flag} {{{choices}}} (default: {group.default})")
         return
     DemoLauncher().mainloop()
 

@@ -1,5 +1,10 @@
 """Live lower-body skeleton from a partial IMU set (default: pelvis + 2 thighs).
 
+The 3D view opens immediately and shows the raw (uncalibrated) live pose. Use
+the in-window "Calibrate" button (or press C/R) to capture a neutral reference
+whenever you want, and "Clear calibration" to return to the raw pose. The view
+keeps running while calibration samples are collected on a background thread.
+
 Usage (from project root):
   conda run --no-capture-output -n humanoid-sim python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005
   conda run --no-capture-output -n humanoid-sim python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config shanks
@@ -15,6 +20,7 @@ from pathlib import Path
 import sys
 
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -106,8 +112,17 @@ def _calibrate(
     buffer: LatestPacketBuffer,
     required_segments: tuple[SegmentId, ...],
     min_samples: int,
-) -> CalibrationProfile:
-    """Block until enough neutral-pose samples have been collected and averaged."""
+    *,
+    progress: dict | None = None,
+    abort: threading.Event | None = None,
+) -> CalibrationProfile | None:
+    """Collect neutral-pose samples and average them into a profile.
+
+    Designed to run on a background thread so the viewer stays responsive.
+    ``progress`` (if given) is updated with ``{"counts", "needed"}`` each tick so
+    the window can show live progress. Returns ``None`` if ``abort`` is set
+    before enough samples are gathered.
+    """
     acc = NeutralCalibrationAccumulator(
         required_segments=required_segments,
         min_samples_per_segment=min_samples,
@@ -117,6 +132,9 @@ def _calibrate(
 
     print(f"\nCalibration — stand still in neutral pose ({min_samples} samples per sensor needed)")
     while not acc.ready():
+        if abort is not None and abort.is_set():
+            print("\n  Calibration aborted.\n")
+            return None
         for seg_id in required_segments:
             pkt = buffer.packets.get(seg_id)
             if pkt is None or last_seqs.get(seg_id) == pkt.sequence:
@@ -124,9 +142,12 @@ def _calibrate(
             last_seqs[seg_id] = pkt.sequence
             acc.add_packet(pkt)
 
+        counts = acc.sample_counts()
+        if progress is not None:
+            progress["counts"] = counts
+            progress["needed"] = min_samples
         now = time.monotonic()
         if now - last_print >= 0.25:
-            counts = acc.sample_counts()
             bar = "  " + " | ".join(
                 f"{s.name.lower()}: {counts.get(s, 0)}/{min_samples}"
                 for s in required_segments
@@ -139,17 +160,19 @@ def _calibrate(
     return acc.build_profile()
 
 
-def _calibrated_segment_orientations(
+def _segment_orientations(
     filtered: dict[SegmentId, Rotation],
     buffer: LatestPacketBuffer,
-    profile: CalibrationProfile,
+    profile: CalibrationProfile | None,
     required_segments: tuple[SegmentId, ...],
     max_age_s: float,
 ) -> dict[SegmentId, Rotation] | None:
-    """Return calibrated world-from-segment orientations, or None if any segment is stale.
+    """Return world-from-segment orientations, or None if any segment is stale.
 
-    Calibration is performed in segment space so that joint angles are zero at
-    the neutral pose regardless of each sensor's absolute heading.
+    When ``profile`` is ``None`` the pose is shown raw/uncalibrated (segment
+    space straight from the mounts). When a profile is provided, calibration is
+    performed in segment space so that joint angles are zero at the neutral pose
+    regardless of each sensor's absolute heading.
     """
     now = time.monotonic()
     seg_orients: dict[SegmentId, Rotation] = {}
@@ -161,12 +184,15 @@ def _calibrated_segment_orientations(
         if raw is None:
             return None
         mount = _SEGMENT_MOUNTS[seg_id]
+        # live_seg = raw * mount^{-1} maps the sensor reading into segment space.
+        live_seg = raw * mount.inv()
+        if profile is None:
+            seg_orients[seg_id] = live_seg
+            continue
         # Calibrate in segment space: neutral_seg^{-1} * live_seg
         # neutral_seg = neutral_sensor * mount^{-1}
-        # live_seg    = raw            * mount^{-1}
         # result      = mount * neutral_sensor^{-1} * raw * mount^{-1}
         neutral_seg = profile.neutral_orientations[seg_id] * mount.inv()
-        live_seg = raw * mount.inv()
         seg_orients[seg_id] = neutral_seg.inv() * live_seg
     return seg_orients
 
@@ -273,54 +299,126 @@ def main() -> None:
         ln.set_3d_properties(coords[:, 2])
         ln.set_visible(True)
 
-    live_title = f"Live pose — {args.config} ({len(required_segments)} IMUs)  |  R = recalibrate"
+    live_title = f"Live pose — {args.config} ({len(required_segments)} IMUs)"
 
-    # show window immediately so the user knows it's working
-    ax.set_title("Waiting to calibrate — check the terminal")
-    plt.pause(0.01)
+    # --- in-window calibration controls ---------------------------------
+    # Calibration is optional and on-demand: the live (uncalibrated) pose is
+    # shown immediately, and the user clicks "Calibrate" whenever they want to
+    # capture a neutral reference. Calibration runs on a background thread so the
+    # 3D view never freezes.
+    fig.subplots_adjust(bottom=0.18)
 
+    # View-preset buttons map to the pelvis/body frame (+X forward, +Y left,
+    # +Z up). Each sets the camera so the named face of the body points toward
+    # you: "Front" looks at the pelvis front (+X), "Rear" at the back, etc.
+    _VIEW_PRESETS = (("Front", 10, 0), ("Rear", 10, 180), ("Left", 10, 90), ("Right", 10, -90))
+    view_buttons = []
+    for _i, (_vlabel, _velev, _vazim) in enumerate(_VIEW_PRESETS):
+        _vax = fig.add_axes([0.07 + _i * 0.225, 0.095, 0.205, 0.05])
+        _vbtn = Button(_vax, _vlabel)
+
+        def _make_view_cb(elev=_velev, azim=_vazim):
+            def _cb(_evt):
+                ax.view_init(elev=elev, azim=azim)
+                fig.canvas.draw_idle()
+            return _cb
+
+        _vbtn.on_clicked(_make_view_cb())
+        view_buttons.append(_vbtn)  # keep refs alive
+
+    calib_button_ax = fig.add_axes([0.13, 0.025, 0.34, 0.05])
+    clear_button_ax = fig.add_axes([0.53, 0.025, 0.34, 0.05])
+    calib_button = Button(calib_button_ax, "Calibrate")
+    clear_button = Button(clear_button_ax, "Clear calibration")
+
+    state: dict = {
+        "profile": None,
+        "calibrating": False,
+        "calib_thread": None,
+        "calib_progress": {},
+        "calib_abort": None,
+    }
+
+    def _run_calibration() -> None:
+        progress = state["calib_progress"]
+        profile = _calibrate(
+            buffer,
+            required_segments,
+            args.min_samples,
+            progress=progress,
+            abort=state["calib_abort"],
+        )
+        if profile is not None:
+            state["profile"] = profile
+        state["calibrating"] = False
+
+    def start_calibration(_event=None) -> None:
+        if state["calibrating"]:
+            return
+        print("\nCalibration — stand still in neutral pose.")
+        state["calibrating"] = True
+        state["calib_progress"] = {}
+        state["calib_abort"] = threading.Event()
+        thread = threading.Thread(target=_run_calibration, daemon=True)
+        state["calib_thread"] = thread
+        thread.start()
+
+    def clear_calibration(_event=None) -> None:
+        # Cancel an in-progress capture, and drop any existing profile so the
+        # view falls back to the raw/uncalibrated pose.
+        if state["calibrating"] and state["calib_abort"] is not None:
+            state["calib_abort"].set()
+        state["profile"] = None
+        print("\nCalibration cleared — showing raw pose.")
+
+    calib_button.on_clicked(start_calibration)
+    clear_button.on_clicked(clear_calibration)
+
+    # 'c'/'r' keys mirror the buttons for convenience.
+    def on_key(event) -> None:
+        if event.key in ("c", "r"):
+            start_calibration()
+
+    fig.canvas.mpl_connect("key_press_event", on_key)
+
+    # --- interaction pausing (anti-flicker) -----------------------------
+    # Continuously calling draw on a 3D axes fights the user's mouse-drag
+    # rotation and repaints while the window is being moved/resized, which looks
+    # like flashing. While the user is interacting (dragging to rotate, or the
+    # backend reports a resize/move via a draw_event), we hold off our periodic
+    # redraws for a short grace period so their interaction stays smooth.
+    interaction = {"until": 0.0}
+
+    def _pause_interaction(seconds: float = 0.4) -> None:
+        interaction["until"] = max(interaction["until"], time.monotonic() + seconds)
+
+    def _interaction_paused() -> bool:
+        return time.monotonic() < interaction["until"]
+
+    # Mouse press/drag on the 3D axes = the user is rotating; release ends it.
+    fig.canvas.mpl_connect("button_press_event", lambda _e: _pause_interaction(2.0))
+    fig.canvas.mpl_connect("button_release_event", lambda _e: _pause_interaction(0.2))
+    fig.canvas.mpl_connect("motion_notify_event", lambda _e: _pause_interaction(0.6) if _e.button else None)
+    # A draw_event we did not trigger (resize / window move) also pauses us.
+    fig.canvas.mpl_connect("resize_event", lambda _e: _pause_interaction(0.5))
+
+    # Optionally kick off calibration automatically (launcher / scripted use).
     if args.no_prompt_calibration:
         print(f"Auto-calibrating in {args.calibration_delay_s:.1f}s — stand still in neutral pose.")
         time.sleep(max(0.0, args.calibration_delay_s))
-    else:
-        try:
-            input("Stand in neutral position, feet shoulder-width apart, then press Enter to calibrate... ")
-        except EOFError:
-            print("No stdin available; calibrating automatically. Stand still in neutral pose.")
-    ax.set_title("Calibrating — stand still...")
-    fig.canvas.draw_idle()
-    plt.pause(0.01)
-
-    profile = _calibrate(buffer, required_segments, args.min_samples)
-    ax.set_title(live_title)
-
-    state = {"recalibrate": False, "profile": profile}
-
-    def on_key(event) -> None:
-        if event.key == "r":
-            state["recalibrate"] = True
-
-    fig.canvas.mpl_connect("key_press_event", on_key)
+        start_calibration()
 
     print("Visualization running.\n")
     print("  Solid lines  = measured segments")
     print("  Dashed lines = estimated (neutral assumed)")
-    print("  Press R in the plot window to recalibrate\n")
+    print("  Click Calibrate (or press C/R) to capture a neutral pose")
+    print("  Click Clear calibration to return to the raw pose\n")
 
     while plt.fignum_exists(fig.number):
-        if state["recalibrate"]:
-            state["recalibrate"] = False
-            ax.set_title("Recalibrating — stand still in neutral position...")
-            fig.canvas.draw_idle()
-            plt.pause(0.01)
-            print("\nRecalibration — stand still in neutral position")
-            state["profile"] = _calibrate(buffer, required_segments, args.min_samples)
-            ax.set_title(live_title)
-
         with filter_lock:
             filtered_snapshot = dict(filtered)
 
-        seg_orients = _calibrated_segment_orientations(
+        seg_orients = _segment_orientations(
             filtered_snapshot, buffer, state["profile"], required_segments, max_age_s
         )
 
@@ -348,10 +446,31 @@ def main() -> None:
         else:
             status_text.set_text("waiting for fresh packets…")
 
-        fig.canvas.draw_idle()
-        plt.pause(0.04)  # ~25 Hz; also pumps the Tk/Qt event loop
+        # Title reflects calibration state so feedback lives in the window.
+        if state["calibrating"]:
+            counts = state["calib_progress"].get("counts", {})
+            needed = state["calib_progress"].get("needed", args.min_samples)
+            done = sum(min(counts.get(s, 0), needed) for s in required_segments)
+            total = needed * len(required_segments)
+            ax.set_title(f"Calibrating — stand still… {done}/{total} samples")
+        elif state["profile"] is None:
+            ax.set_title(f"{live_title}  |  UNCALIBRATED — click Calibrate")
+        else:
+            ax.set_title(f"{live_title}  |  calibrated")
+
+        # Only push a redraw when the user is NOT interacting. While they rotate
+        # or move/resize the window we just keep the artist data current and let
+        # the backend own the canvas, which removes the flashing. flush_events
+        # pumps the GUI loop (keeps buttons/rotation responsive) without forcing
+        # the full-figure redraw that plt.pause() does.
+        if not _interaction_paused():
+            fig.canvas.draw_idle()
+        fig.canvas.flush_events()
+        time.sleep(0.04)  # ~25 Hz target
 
     stop_event.set()
+    if state["calib_abort"] is not None:
+        state["calib_abort"].set()
     print("Window closed.")
 
 
