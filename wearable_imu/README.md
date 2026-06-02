@@ -61,6 +61,10 @@ Or open the clickable launcher that lists every demo with a Run/Stop button:
 python demos/demo_launcher.py
 ```
 
+For the full IMU/camera -> ch_robot MuJoCo runbook, including all command
+lines for offline replay, 50 Hz ZMQ mock-live, and troubleshooting, see
+[`retargeting/RUNBOOK_imu_to_ch_robot.md`](retargeting/RUNBOOK_imu_to_ch_robot.md).
+
 ---
 
 ## Environment Setup
