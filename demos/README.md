@@ -61,6 +61,7 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 | Script | What it does | Key flags |
 |---|---|---|
 | `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--no-prompt-calibration` |
+| `demo_record_human_joint_clip.py` | Offline recorder that saves ML retargeting joint positions (`Spine1`, hips, knees, ankles, and generated toe points) to `.npz`. | `--config {thighs,shanks,full}`, `--duration-s`, `--fps`, `--output` |
 | `demo_udp_quaternion_receiver.py` | Text-only packet monitor: per-segment rate, age, receive/sensor jitter, drops, raw quaternions. | `--host`, `--port`, `--max-age-ms` |
 | `demo_udp_latency_ping.py` | Round-trip UDP latency test to one node. | positional `esp32_ip`, `--port`, `--count`, `--interval-ms`, `--timeout-ms` |
 
@@ -72,6 +73,9 @@ python demos/demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config
 
 # Just the three-IMU set (pelvis + both thighs), auto-calibrate without prompting
 python demos/demo_partial_imu_live_viewer.py --config thighs --no-prompt-calibration
+
+# Record a 10-second ML handoff clip from the five-IMU shanks setup
+python demos/demo_record_human_joint_clip.py --config shanks --duration-s 10 --fps 30 --output data/recordings/example_walk.npz
 
 # Check packets are arriving before launching the viewer
 python demos/demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
