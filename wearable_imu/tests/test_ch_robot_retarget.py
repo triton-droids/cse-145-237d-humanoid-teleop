@@ -79,9 +79,27 @@ def test_known_robot_frame_joint_rotations_map_to_contract_order() -> None:
 
     np.testing.assert_allclose(
         qpos[FLOATING_BASE_QPOS_DIMS:],
-        [0.20, -0.30, 0.40, 0.55, -0.12, -0.10, 0.15, -0.25, -0.35, 0.22],
+        [-0.10, 0.15, -0.25, -0.35, 0.22, 0.20, -0.30, 0.40, 0.55, -0.12],
         atol=1e-12,
     )
+
+
+def test_human_sides_drive_matching_display_sides_not_xml_bank_names() -> None:
+    left = LegPose(
+        hip=Rotation.identity(),
+        knee=_from_robot_frame(Rotation.from_euler("x", 0.25)),
+        ankle=Rotation.identity(),
+    )
+    right = LegPose(
+        hip=Rotation.identity(),
+        knee=_from_robot_frame(Rotation.from_euler("x", 0.75)),
+        ankle=Rotation.identity(),
+    )
+
+    qpos = legposes_to_qpos({"left": left, "right": right})
+
+    assert qpos[10] == pytest.approx(0.75)
+    assert qpos[15] == pytest.approx(0.25)
 
 
 def test_missing_knee_and_ankle_are_neutral() -> None:

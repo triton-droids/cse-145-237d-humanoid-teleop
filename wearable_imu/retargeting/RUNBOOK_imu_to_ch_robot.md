@@ -119,6 +119,11 @@ ch_robot/MuJoCo frame. For position-only replay, generated toe points that
 point behind the pelvis forward axis are flipped back to anatomical forward so
 shank-only IMU clips do not display feet facing backward.
 
+The ch_robot MJCF `left_*`/`right_*` joint bank names are opposite of the human
+display side after this frame conversion. The qpos contract order is unchanged,
+but retargeting feeds each bank from the human side that appears on the same
+side in the viewer.
+
 ## 5. Offline MuJoCo Visualization: Camera JSONL
 
 First run a no-window smoke test:

@@ -134,6 +134,15 @@ SIDE_JOINT_SIGNS: dict[Side, np.ndarray] = {
     "right": np.ones(5, dtype=np.float64),
 }
 
+# The ch_robot MJCF joint banks are named left/right from the XML, but their
+# lateral placement is opposite of the human display frame used by these demos.
+# Keep the qpos contract order, while feeding each bank from the human side that
+# appears on the same side in the MuJoCo viewer.
+CH_ROBOT_BANK_SOURCE_SIDE: dict[Side, Side] = {
+    "left": "right",
+    "right": "left",
+}
+
 
 @dataclass
 class QvelFiniteDifferencer:
@@ -191,8 +200,8 @@ def legposes_to_qpos(
 
     joint_values = np.array(
         [
-            *_leg_joint_values("left", joint_rotations["left"]),
-            *_leg_joint_values("right", joint_rotations["right"]),
+            *_leg_joint_values("left", joint_rotations[CH_ROBOT_BANK_SOURCE_SIDE["left"]]),
+            *_leg_joint_values("right", joint_rotations[CH_ROBOT_BANK_SOURCE_SIDE["right"]]),
         ],
         dtype=np.float64,
     )
