@@ -99,11 +99,13 @@ DEMOS: tuple[DemoSpec, ...] = (
     ),
     DemoSpec(
         key="partial-imu-live-viewer",
-        title="Partial IMU Viewer",
+        title="Partial IMU Viewer + Recorder",
         script=PROJECT_ROOT / "demos" / "demo_partial_imu_live_viewer.py",
-        description="Live lower-body skeleton from real IMU packets, with estimated distal segments.",
-        default_args=("--no-prompt-calibration",),
-        notes="Pick the IMU set on the right. thighs=3 (pelvis+thighs), shanks=5 (+shanks), full=7.",
+        description="Live lower-body skeleton from real IMU packets, with calibration and ML clip recording controls.",
+        notes=(
+            "Pick the IMU set on the right. Click Calibrate, then Record in the plot window. "
+            "Use Extra args for --record-duration-s, --record-fps, or --record-output."
+        ),
         options=(
             OptionGroup(
                 key="config",
@@ -113,30 +115,6 @@ DEMOS: tuple[DemoSpec, ...] = (
                 default="thighs",
             ),
         ),
-    ),
-    DemoSpec(
-        key="record-human-joints-thighs",
-        title="Record Human Joints - Thighs",
-        script=PROJECT_ROOT / "demos" / "demo_record_human_joint_clip.py",
-        description="Record root, hip, knee, ankle, and generated foot positions for ML retargeting.",
-        default_args=("--config", "thighs", "--duration-s", "10", "--output", "data/recordings/human_joint_clip_thighs.npz"),
-        notes="Requires pelvis, left_thigh, and right_thigh. Add --duration-s in Extra args to override.",
-    ),
-    DemoSpec(
-        key="record-human-joints-shanks",
-        title="Record Human Joints - Shanks",
-        script=PROJECT_ROOT / "demos" / "demo_record_human_joint_clip.py",
-        description="Record the 5-IMU lower-body joint-position clip requested by ML.",
-        default_args=("--config", "shanks", "--duration-s", "10", "--output", "data/recordings/human_joint_clip_shanks.npz"),
-        notes="Use this for the current 5-ESP32 setup: pelvis, thighs, and shanks.",
-    ),
-    DemoSpec(
-        key="record-human-joints-full",
-        title="Record Human Joints - Full",
-        script=PROJECT_ROOT / "demos" / "demo_record_human_joint_clip.py",
-        description="Record a full seven-segment lower-body joint-position clip for ML retargeting.",
-        default_args=("--config", "full", "--duration-s", "10", "--output", "data/recordings/human_joint_clip_full.npz"),
-        notes="Requires all seven lower-body segment packets.",
     ),
     DemoSpec(
         key="udp-quaternion-receiver",

@@ -1,9 +1,11 @@
-"""Live lower-body skeleton from a partial IMU set (default: pelvis + 2 thighs).
+"""Live lower-body skeleton from a partial IMU set, with optional recording.
 
 The 3D view opens immediately and shows the raw (uncalibrated) live pose. Use
 the in-window "Calibrate" button (or press C/R) to capture a neutral reference
 whenever you want, and "Clear calibration" to return to the raw pose. The view
 keeps running while calibration samples are collected on a background thread.
+After calibration, use "Record" to save an ML retargeting clip while watching
+the live pose.
 
 Usage (from project root):
   conda run --no-capture-output -n humanoid-sim python demos\demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005
@@ -35,6 +37,13 @@ from sensor.filtering import QuaternionPacketFilter  # noqa: E402
 from sensor.packet import SegmentId  # noqa: E402
 from sensor.udp_receiver import LatestPacketBuffer, receive_quaternion_packets  # noqa: E402
 from simulator.mujoco_lower_body import lower_body_points_from_skeleton  # noqa: E402
+from demos.demo_record_human_joint_clip import (  # noqa: E402
+    frame_as_dict,
+    ml_joint_positions_w,
+    origin_relative_points,
+    pelvis_ground_origin_w,
+    save_ml_joint_clip,
+)
 
 
 PARTIAL_CONFIGS: dict[str, tuple[SegmentId, ...]] = {
@@ -104,6 +113,24 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1.0,
         help="Delay before automatic calibration when --no-prompt-calibration is used.",
+    )
+    parser.add_argument(
+        "--record-duration-s",
+        type=float,
+        default=10.0,
+        help="Recording duration when the Record button is clicked.",
+    )
+    parser.add_argument(
+        "--record-fps",
+        type=float,
+        default=30.0,
+        help="Recording sample rate when the Record button is clicked.",
+    )
+    parser.add_argument(
+        "--record-output",
+        type=Path,
+        default=Path("data/recordings/live_human_joint_clip.npz"),
+        help="Output .npz path used by the Record button.",
     )
     return parser.parse_args()
 
@@ -199,6 +226,11 @@ def _segment_orientations(
 
 def main() -> None:
     args = parse_args()
+    if args.record_fps <= 0.0:
+        raise ValueError("--record-fps must be greater than zero")
+    if args.record_duration_s <= 0.0:
+        raise ValueError("--record-duration-s must be greater than zero")
+
     required_segments = PARTIAL_CONFIGS[args.config]
     max_age_s = args.max_age_ms / 1000.0
 
@@ -306,7 +338,7 @@ def main() -> None:
     # shown immediately, and the user clicks "Calibrate" whenever they want to
     # capture a neutral reference. Calibration runs on a background thread so the
     # 3D view never freezes.
-    fig.subplots_adjust(bottom=0.18)
+    fig.subplots_adjust(bottom=0.22)
 
     # View-preset buttons map to the pelvis/body frame (+X forward, +Y left,
     # +Z up). Each sets the camera so the named face of the body points toward
@@ -314,7 +346,7 @@ def main() -> None:
     _VIEW_PRESETS = (("Front", 10, 0), ("Rear", 10, 180), ("Left", 10, 90), ("Right", 10, -90))
     view_buttons = []
     for _i, (_vlabel, _velev, _vazim) in enumerate(_VIEW_PRESETS):
-        _vax = fig.add_axes([0.07 + _i * 0.225, 0.095, 0.205, 0.05])
+        _vax = fig.add_axes([0.07 + _i * 0.225, 0.13, 0.205, 0.05])
         _vbtn = Button(_vax, _vlabel)
 
         def _make_view_cb(elev=_velev, azim=_vazim):
@@ -326,10 +358,14 @@ def main() -> None:
         _vbtn.on_clicked(_make_view_cb())
         view_buttons.append(_vbtn)  # keep refs alive
 
-    calib_button_ax = fig.add_axes([0.13, 0.025, 0.34, 0.05])
-    clear_button_ax = fig.add_axes([0.53, 0.025, 0.34, 0.05])
+    calib_button_ax = fig.add_axes([0.06, 0.045, 0.20, 0.055])
+    clear_button_ax = fig.add_axes([0.28, 0.045, 0.20, 0.055])
+    record_button_ax = fig.add_axes([0.50, 0.045, 0.20, 0.055])
+    stop_record_button_ax = fig.add_axes([0.72, 0.045, 0.20, 0.055])
     calib_button = Button(calib_button_ax, "Calibrate")
     clear_button = Button(clear_button_ax, "Clear calibration")
+    record_button = Button(record_button_ax, "Record")
+    stop_record_button = Button(stop_record_button_ax, "Stop rec")
 
     state: dict = {
         "profile": None,
@@ -337,7 +373,102 @@ def main() -> None:
         "calib_thread": None,
         "calib_progress": {},
         "calib_abort": None,
+        "recording": False,
+        "record_start_s": 0.0,
+        "record_next_sample_s": 0.0,
+        "record_target_frames": 0,
+        "record_period_s": 1.0 / args.record_fps,
+        "record_origin_w": None,
+        "record_timestamps_s": [],
+        "record_point_frames_w": [],
+        "record_point_frames_origin": [],
+        "record_root_pos_frames_w": [],
+        "record_root_quat_frames_wxyz": [],
+        "record_skipped": 0,
+        "record_message": "idle",
     }
+
+    def _reset_recording_buffers() -> None:
+        state["record_origin_w"] = None
+        state["record_timestamps_s"] = []
+        state["record_point_frames_w"] = []
+        state["record_point_frames_origin"] = []
+        state["record_root_pos_frames_w"] = []
+        state["record_root_quat_frames_wxyz"] = []
+        state["record_skipped"] = 0
+
+    def _finish_recording(*, reason: str = "complete") -> None:
+        if not state["recording"]:
+            return
+        state["recording"] = False
+        record_button.label.set_text("Record")
+
+        frames = state["record_point_frames_w"]
+        origin_w = state["record_origin_w"]
+        if not frames or origin_w is None:
+            state["record_message"] = f"recording stopped ({reason}); no valid frames saved"
+            print(f"\n{state['record_message']}")
+            _reset_recording_buffers()
+            return
+
+        try:
+            point_array_w, point_array_origin = save_ml_joint_clip(
+                output=args.record_output,
+                point_frames_w=frames,
+                point_frames_origin=state["record_point_frames_origin"],
+                root_pos_frames_w=state["record_root_pos_frames_w"],
+                root_quat_frames_wxyz=state["record_root_quat_frames_wxyz"],
+                timestamps_s=state["record_timestamps_s"],
+                fps=args.record_fps,
+                config=args.config,
+                required_segments=required_segments,
+                pelvis_ground_origin=origin_w,
+            )
+        except ValueError as exc:
+            state["record_message"] = f"recording failed: {exc}"
+            print(f"\n{state['record_message']}")
+            _reset_recording_buffers()
+            return
+
+        state["record_message"] = (
+            f"saved {len(frames)} frames to {args.record_output} "
+            f"(skipped {state['record_skipped']})"
+        )
+        print(f"\nSaved clip: {args.record_output}")
+        print(f"  joint_pos_origin: {point_array_origin.shape}")
+        print(f"  joint_pos_w     : {point_array_w.shape}")
+        print(f"  sample frame    : {frame_as_dict(point_array_origin[0])}")
+        print(f"  skipped stale frames: {state['record_skipped']}")
+        _reset_recording_buffers()
+
+    def start_recording(_event=None) -> None:
+        if state["recording"]:
+            return
+        if state["calibrating"]:
+            state["record_message"] = "finish calibration before recording"
+            print(f"\n{state['record_message']}")
+            return
+        if state["profile"] is None:
+            state["record_message"] = "calibrate before recording"
+            print(f"\n{state['record_message']}")
+            return
+
+        _reset_recording_buffers()
+        now = time.monotonic()
+        state["recording"] = True
+        state["record_start_s"] = now
+        state["record_next_sample_s"] = now
+        state["record_period_s"] = 1.0 / args.record_fps
+        state["record_target_frames"] = max(1, int(round(args.record_duration_s * args.record_fps)))
+        state["record_message"] = f"recording to {args.record_output}"
+        record_button.label.set_text("Recording...")
+        print(
+            f"\nRecording {state['record_target_frames']} frames at "
+            f"{args.record_fps:g} FPS to {args.record_output}"
+        )
+
+    def stop_recording(_event=None) -> None:
+        _finish_recording(reason="manual stop")
 
     def _run_calibration() -> None:
         progress = state["calib_progress"]
@@ -355,6 +486,10 @@ def main() -> None:
     def start_calibration(_event=None) -> None:
         if state["calibrating"]:
             return
+        if state["recording"]:
+            state["record_message"] = "stop recording before recalibrating"
+            print(f"\n{state['record_message']}")
+            return
         print("\nCalibration — stand still in neutral pose.")
         state["calibrating"] = True
         state["calib_progress"] = {}
@@ -366,6 +501,8 @@ def main() -> None:
     def clear_calibration(_event=None) -> None:
         # Cancel an in-progress capture, and drop any existing profile so the
         # view falls back to the raw/uncalibrated pose.
+        if state["recording"]:
+            _finish_recording(reason="calibration cleared")
         if state["calibrating"] and state["calib_abort"] is not None:
             state["calib_abort"].set()
         state["profile"] = None
@@ -373,11 +510,17 @@ def main() -> None:
 
     calib_button.on_clicked(start_calibration)
     clear_button.on_clicked(clear_calibration)
+    record_button.on_clicked(start_recording)
+    stop_record_button.on_clicked(stop_recording)
 
-    # 'c'/'r' keys mirror the buttons for convenience.
+    # Keyboard shortcuts mirror the buttons for convenience.
     def on_key(event) -> None:
         if event.key in ("c", "r"):
             start_calibration()
+        elif event.key == " ":
+            start_recording()
+        elif event.key == "escape":
+            stop_recording()
 
     fig.canvas.mpl_connect("key_press_event", on_key)
 
@@ -412,6 +555,8 @@ def main() -> None:
     print("  Solid lines  = measured segments")
     print("  Dashed lines = estimated (neutral assumed)")
     print("  Click Calibrate (or press C/R) to capture a neutral pose")
+    print("  Click Record (or press Space) after calibration to save an ML clip")
+    print("  Click Stop rec (or press Esc) to end recording early")
     print("  Click Clear calibration to return to the raw pose\n")
 
     while plt.fignum_exists(fig.number):
@@ -442,8 +587,55 @@ def main() -> None:
                 f"{s.name.lower()}: {1000*(now - buffer.packets[s].receive_time_s):.0f}ms"
                 for s in required_segments
             )
+            if state["recording"] and now >= state["record_next_sample_s"]:
+                state["record_next_sample_s"] += state["record_period_s"]
+                points_w = ml_joint_positions_w(skeleton)
+                if state["record_origin_w"] is None:
+                    state["record_origin_w"] = pelvis_ground_origin_w(points_w)
+
+                root_rotation = skeleton.segment_orientations[SegmentId.PELVIS]
+                root_quat_xyzw = root_rotation.as_quat()
+                root_quat_wxyz = np.array(
+                    [
+                        root_quat_xyzw[3],
+                        root_quat_xyzw[0],
+                        root_quat_xyzw[1],
+                        root_quat_xyzw[2],
+                    ],
+                    dtype=float,
+                )
+                state["record_timestamps_s"].append(now - state["record_start_s"])
+                state["record_point_frames_w"].append(points_w)
+                state["record_point_frames_origin"].append(
+                    origin_relative_points(points_w, state["record_origin_w"])
+                )
+                state["record_root_pos_frames_w"].append(skeleton.joints["pelvis"].copy())
+                state["record_root_quat_frames_wxyz"].append(root_quat_wxyz)
+
+                frame_count = len(state["record_point_frames_w"])
+                target_frames = state["record_target_frames"]
+                state["record_message"] = (
+                    f"recording {frame_count}/{target_frames} "
+                    f"(skipped {state['record_skipped']})"
+                )
+                if frame_count >= target_frames:
+                    _finish_recording()
+
+            if state["recording"]:
+                age_info = f"{age_info}\n{state['record_message']}"
+            elif state["record_message"] != "idle":
+                age_info = f"{age_info}\n{state['record_message']}"
             status_text.set_text(age_info)
         else:
+            now = time.monotonic()
+            if state["recording"] and now >= state["record_next_sample_s"]:
+                state["record_next_sample_s"] += state["record_period_s"]
+                state["record_skipped"] += 1
+                state["record_message"] = (
+                    f"recording {len(state['record_point_frames_w'])}/"
+                    f"{state['record_target_frames']} "
+                    f"(skipped {state['record_skipped']})"
+                )
             status_text.set_text("waiting for fresh packets…")
 
         # Title reflects calibration state so feedback lives in the window.
@@ -455,6 +647,8 @@ def main() -> None:
             ax.set_title(f"Calibrating — stand still… {done}/{total} samples")
         elif state["profile"] is None:
             ax.set_title(f"{live_title}  |  UNCALIBRATED — click Calibrate")
+        elif state["recording"]:
+            ax.set_title(f"{live_title}  |  calibrated  |  {state['record_message']}")
         else:
             ax.set_title(f"{live_title}  |  calibrated")
 
@@ -466,11 +660,13 @@ def main() -> None:
         if not _interaction_paused():
             fig.canvas.draw_idle()
         fig.canvas.flush_events()
-        time.sleep(0.04)  # ~25 Hz target
+        time.sleep(0.02)  # ~50 Hz event loop; recording defaults to 30 FPS
 
     stop_event.set()
     if state["calib_abort"] is not None:
         state["calib_abort"].set()
+    if state["recording"]:
+        _finish_recording(reason="window closed")
     print("Window closed.")
 
 

@@ -200,6 +200,49 @@ def frame_as_dict(points: np.ndarray) -> dict[str, list[float]]:
     }
 
 
+def save_ml_joint_clip(
+    *,
+    output: Path,
+    point_frames_w: list[np.ndarray],
+    point_frames_origin: list[np.ndarray],
+    root_pos_frames_w: list[np.ndarray],
+    root_quat_frames_wxyz: list[np.ndarray],
+    timestamps_s: list[float],
+    fps: float,
+    config: str,
+    required_segments: tuple[SegmentId, ...],
+    pelvis_ground_origin: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Save an ML handoff clip and return ``(joint_pos_w, joint_pos_origin)``."""
+
+    if not point_frames_w:
+        raise ValueError("cannot save an empty ML joint clip")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    point_array_w = np.stack(point_frames_w)
+    point_array_origin = np.stack(point_frames_origin)
+    root_pos_array_w = np.stack(root_pos_frames_w)
+    root_quat_array_wxyz = np.stack(root_quat_frames_wxyz)
+
+    np.savez(
+        output,
+        point_names=np.array(JOINT_NAMES),
+        joint_names=np.array(JOINT_NAMES),
+        joint_pos_origin=point_array_origin,
+        joint_pos_w=point_array_w,
+        pelvis_ground_origin_w=pelvis_ground_origin,
+        frame0_pelvis_w=point_array_w[0, 0].copy(),
+        root_pos_w=root_pos_array_w,
+        root_quat_wxyz=root_quat_array_wxyz,
+        timestamps_s=np.array(timestamps_s, dtype=float),
+        fps=np.array([fps], dtype=float),
+        config=np.array([config]),
+        required_segments=np.array([segment.name.lower() for segment in required_segments]),
+        foot_definition=np.array(["LeftToeBase/RightToeBase are generated toe points from the body model"]),
+    )
+    return point_array_w, point_array_origin
+
+
 def wait_for_segments(buffer: LatestPacketBuffer, required_segments: tuple[SegmentId, ...]) -> None:
     print("Waiting for required IMU segments...")
     last_print = 0.0
@@ -305,29 +348,20 @@ def main() -> None:
             if len(point_frames_w) % max(1, int(args.fps)) == 0:
                 print(f"  recorded {len(point_frames_w)}/{target_frames} frames")
 
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        point_array_w = np.stack(point_frames_w)
-        point_array_origin = np.stack(point_frames_origin)
-        root_pos_array_w = np.stack(root_pos_frames_w)
-        root_quat_array_wxyz = np.stack(root_quat_frames_wxyz)
         if origin_w is None:
             raise RuntimeError("recording finished without a valid frame")
 
-        np.savez(
-            args.output,
-            point_names=np.array(JOINT_NAMES),
-            joint_names=np.array(JOINT_NAMES),
-            joint_pos_origin=point_array_origin,
-            joint_pos_w=point_array_w,
-            pelvis_ground_origin_w=origin_w,
-            frame0_pelvis_w=point_array_w[0, 0].copy(),
-            root_pos_w=root_pos_array_w,
-            root_quat_wxyz=root_quat_array_wxyz,
-            timestamps_s=np.array(timestamps_s, dtype=float),
-            fps=np.array([args.fps], dtype=float),
-            config=np.array([args.config]),
-            required_segments=np.array([segment.name.lower() for segment in required_segments]),
-            foot_definition=np.array(["LeftToeBase/RightToeBase are generated toe points from the body model"]),
+        point_array_w, point_array_origin = save_ml_joint_clip(
+            output=args.output,
+            point_frames_w=point_frames_w,
+            point_frames_origin=point_frames_origin,
+            root_pos_frames_w=root_pos_frames_w,
+            root_quat_frames_wxyz=root_quat_frames_wxyz,
+            timestamps_s=timestamps_s,
+            fps=args.fps,
+            config=args.config,
+            required_segments=required_segments,
+            pelvis_ground_origin=origin_w,
         )
         print(f"Saved clip: {args.output}")
         print(f"  joint_pos_origin: {point_array_origin.shape}")

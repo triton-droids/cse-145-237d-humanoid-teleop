@@ -60,7 +60,7 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 
 | Script | What it does | Key flags |
 |---|---|---|
-| `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--no-prompt-calibration` |
+| `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). Includes Calibrate, Clear calibration, Record, and Stop rec buttons. In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--record-duration-s`, `--record-fps`, `--record-output` |
 | `demo_record_human_joint_clip.py` | Offline recorder that saves ML retargeting joint positions (`Spine1`, hips, knees, ankles, and generated toe points) to `.npz`. | `--config {thighs,shanks,full}`, `--duration-s`, `--fps`, `--output` |
 | `demo_udp_quaternion_receiver.py` | Text-only packet monitor: per-segment rate, age, receive/sensor jitter, drops, raw quaternions. | `--host`, `--port`, `--max-age-ms` |
 | `demo_udp_latency_ping.py` | Round-trip UDP latency test to one node. | positional `esp32_ip`, `--port`, `--count`, `--interval-ms`, `--timeout-ms` |
@@ -71,10 +71,10 @@ Examples:
 # Full 7-IMU live skeleton
 python demos/demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config full
 
-# Just the three-IMU set (pelvis + both thighs), auto-calibrate without prompting
-python demos/demo_partial_imu_live_viewer.py --config thighs --no-prompt-calibration
+# Five-IMU live skeleton + in-window recorder
+python demos/demo_partial_imu_live_viewer.py --config shanks --record-duration-s 10 --record-output data/recordings/example_walk.npz
 
-# Record a 10-second ML handoff clip from the five-IMU shanks setup
+# Headless-style offline recorder without the live viewer
 python demos/demo_record_human_joint_clip.py --config shanks --duration-s 10 --fps 30 --output data/recordings/example_walk.npz
 
 # Check packets are arriving before launching the viewer
@@ -97,6 +97,12 @@ raw, uncalibrated pose, and the live view keeps running the whole time:
 - **Calibrate** button (or press **C**/**R**) — capture a neutral standing
   reference; calibration runs in the background so the view never freezes.
 - **Clear calibration** button — drop the profile and return to the raw pose.
+- **Record** button (or press **Space**) — after calibration, record the live
+  calibrated skeleton to an ML `.npz` clip using the `Spine1`, `LeftUpLeg`,
+  `LeftLeg`, `LeftFoot`, `LeftToeBase`, `RightUpLeg`, `RightLeg`,
+  `RightFoot`, `RightToeBase` joint order.
+- **Stop rec** button (or press **Esc**) — save the clip early with whatever
+  valid frames have been captured.
 - **Front / Rear / Left / Right** buttons — snap the camera to that face of the
   pelvis/body (`+X` forward, `+Y` left, `+Z` up). You can still drag to orbit
   freely; periodic redraws pause while you rotate or move the window to avoid
