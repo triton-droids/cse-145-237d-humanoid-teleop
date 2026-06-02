@@ -72,7 +72,7 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 |---|---|---|
 | `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). Includes Calibrate, Clear calibration, Record, and Stop rec buttons. In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--record-duration-s`, `--record-fps`, `--record-output` |
 | `demo_live_retarget.py` | Headless live Plan A bridge: IMU packets -> calibrated lower-body skeleton -> ch_robot `qpos[17]` and `qvel[16]`, emitted as JSON lines over stdout or UDP. | `--config {thighs,shanks,full}`, `--output {stdout,udp,none}`, `--target-host`, `--target-port`, `--fps`, `--yaw-mode {keep,strip}` |
-| `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` or camera `.jsonl` clip through Plan A, visualize the skeleton, and show the resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--no-show` |
+| `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` or camera `.jsonl` clip through Plan A, visualize the skeleton, and show source human/root values plus resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--hide-input-data`, `--no-show` |
 | `demo_mujoco_ch_robot_replay.py` | Replay a recorded IMU/camera handoff clip or saved ch_robot qpos replay on the real Holosoma `ch_robot_10dof.xml` MuJoCo model. Auto-extracts XML/meshes from `retargeting_holosoma` into `.cache/`. | positional `input`, `--speed`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--no-show`, `--refresh-model` |
 | `demo_compare_human_clip_ch_robot.py` | Open the raw human `.npz` skeleton player and retargeted ch_robot MuJoCo replay together for before/after inspection. | positional `clip`, `--speed`, `--human-origin`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--no-show` |
 | `demo_zmq_human_joint_publisher.py` | Publish a recorded `human_joint_clip_*.npz` or camera `.jsonl` as mock-live 9-joint frames over ZeroMQ at 50 Hz or a chosen rate. | positional `clip`, `--endpoint`, `--fps`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--max-frames` |
@@ -100,19 +100,19 @@ python demos/demo_live_retarget.py --config shanks --output stdout --fps 100
 python demos/demo_live_retarget.py --config full --output udp --target-host 127.0.0.1 --target-port 6010
 
 # Replay a recorded IMU handoff clip through ch_robot retargeting with visualization
-python demos/demo_replay_ch_robot_retarget.py ../data/human_joint_clip_20260601_231345.npz
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz
 
 # Run the recorded IMU handoff on the actual ch_robot MuJoCo model from retargeting_holosoma
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy
 
 # Open raw human skeleton and retargeted ch_robot MuJoCo replay together
-python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy
 
 # Or run a saved qpos/qvel replay on the actual ch_robot MuJoCo model
 python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_20260601_231345.npz
 
 # Mock-live ZMQ stream from a recorded dataset at 50 Hz
-python demos/demo_zmq_human_joint_publisher.py ../data/human_joint_clip_20260601_231345.npz --fps 50
+python demos/demo_zmq_human_joint_publisher.py ../data/demo_1.npz --fps 50
 
 # Mock-live ZMQ stream from a camera JSONL capture at 50 Hz
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --fps 50

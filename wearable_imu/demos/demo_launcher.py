@@ -23,7 +23,7 @@ from tkinter import messagebox, ttk
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ANSI_CLEAR_HOME = "\033[2J\033[H"
 DEFAULT_CAMERA_CLIP = "../data/smplh_capture_3.jsonl"
-DEFAULT_HUMAN_CLIP = "../data/human_joint_clip_20260601_231345.npz"
+DEFAULT_HUMAN_CLIP = "../data/demo_1.npz"
 DEFAULT_ZMQ_ENDPOINT = "tcp://127.0.0.1:5556"
 DEFAULT_UDP_HOST = "0.0.0.0"
 DEFAULT_IMU_PORT = "5005"
@@ -265,11 +265,12 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip path", "", default=DEFAULT_CAMERA_CLIP, placeholder="../data/smplh_capture_3.jsonl"),
+            Field("clip", "Clip path", "", default=DEFAULT_HUMAN_CLIP, placeholder="../data/demo_1.npz"),
             Field("save_output", "Save .npz", "--save-output", placeholder="../data/ch_robot_replay_qpos.npz"),
             Field("speed", "Speed", "--speed", default="1.0", placeholder="1.0"),
         ),
         toggles=(
+            Toggle("hide_input_data", "Hide input data", "--hide-input-data"),
             Toggle("no_show", "No window", "--no-show"),
         ),
         needs_args=True,
@@ -343,7 +344,7 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip .npz", "", default=DEFAULT_HUMAN_CLIP, placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("clip", "Clip .npz", "", default=DEFAULT_HUMAN_CLIP, placeholder="../data/demo_1.npz"),
             Field("speed", "Speed", "--speed", default="1.0", placeholder="1.0"),
         ),
         toggles=(

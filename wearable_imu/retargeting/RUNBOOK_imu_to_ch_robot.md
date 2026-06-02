@@ -73,7 +73,7 @@ conda env update -f env/environment.yml
 Common input files:
 
 ```bash
-../data/human_joint_clip_20260601_231345.npz
+../data/demo_1.npz
 ../data/human_joint_clip_20260601_231346.npz
 ../data/smplh_capture_3.jsonl
 ```
@@ -154,32 +154,32 @@ mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --ba
 No-window smoke test:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --no-show --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --no-show --base-motion root_xy
 ```
 
 Open the viewer:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy
 ```
 
 If you only want in-place leg motion:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion fixed
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion fixed
 ```
 
 Change playback speed:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 0.5
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 2.0
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy --speed 0.5
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy --speed 2.0
 ```
 
 Disable looping:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --no-loop
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy --no-loop
 ```
 
 ## 7. Play a Human Joint Clip
@@ -191,26 +191,26 @@ joint clips, not camera `.jsonl` captures.
 Print a summary without opening a window:
 
 ```bash
-python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --no-show
+python demos/demo_play_human_joint_clip.py ../data/demo_1.npz --no-show
 ```
 
 Open the 3D human skeleton player:
 
 ```bash
-python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz
+python demos/demo_play_human_joint_clip.py ../data/demo_1.npz
 ```
 
 Show pelvis-origin-relative joint positions instead of world positions:
 
 ```bash
-python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --origin
+python demos/demo_play_human_joint_clip.py ../data/demo_1.npz --origin
 ```
 
 Change playback speed:
 
 ```bash
-python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --speed 0.5
-python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --speed 2.0
+python demos/demo_play_human_joint_clip.py ../data/demo_1.npz --speed 0.5
+python demos/demo_play_human_joint_clip.py ../data/demo_1.npz --speed 2.0
 ```
 
 Useful interpretation:
@@ -230,7 +230,7 @@ both child demos and stops both when either window closes.
 Basic before/after comparison:
 
 ```bash
-python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy
 ```
 
 Show the human skeleton in pelvis-origin coordinates while the robot uses
@@ -238,7 +238,7 @@ Show the human skeleton in pelvis-origin coordinates while the robot uses
 
 ```bash
 python demos/demo_compare_human_clip_ch_robot.py \
-  ../data/human_joint_clip_20260601_231345.npz \
+  ../data/demo_1.npz \
   --human-origin \
   --base-motion root_xy
 ```
@@ -246,15 +246,15 @@ python demos/demo_compare_human_clip_ch_robot.py \
 Slow down or speed up both windows together:
 
 ```bash
-python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 0.5
-python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --speed 2.0
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy --speed 0.5
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy --speed 2.0
 ```
 
 No-window smoke test for the combined command:
 
 ```bash
 python demos/demo_compare_human_clip_ch_robot.py \
-  ../data/human_joint_clip_20260601_231345.npz \
+  ../data/demo_1.npz \
   --base-motion root_xy \
   --no-show
 ```
@@ -267,7 +267,9 @@ retargeting debug view.
 ## 9. Matplotlib Retargeting Debug View
 
 This path does not open MuJoCo. It visualizes the human skeleton and shows the
-resulting ch_robot joint angles.
+resulting ch_robot joint angles. The right-side readout also shows the
+retargeting input data before conversion: source human joint `xyz` values,
+`root_pos_w`, and `root_quat_wxyz` when those arrays are present in the `.npz`.
 
 Camera JSONL:
 
@@ -278,7 +280,20 @@ python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --ba
 IMU NPZ:
 
 ```bash
-python demos/demo_replay_ch_robot_retarget.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy
+```
+
+This is the command for the view with the human skeleton and numeric readout on
+the right:
+
+```bash
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy
+```
+
+Hide the source input data and show only ch_robot joint angles:
+
+```bash
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy --hide-input-data
 ```
 
 Convert only and print a summary:
@@ -372,7 +387,7 @@ Terminal 2:
 
 ```bash
 python demos/demo_zmq_human_joint_publisher.py \
-  ../data/human_joint_clip_20260601_231345.npz \
+  ../data/demo_1.npz \
   --endpoint tcp://127.0.0.1:5556 \
   --fps 50
 ```
@@ -437,7 +452,7 @@ paths are:
 
 ```text
 Camera JSONL : ../data/smplh_capture_3.jsonl
-Human NPZ    : ../data/human_joint_clip_20260601_231345.npz
+Human NPZ    : ../data/demo_1.npz
 ZMQ endpoint : tcp://127.0.0.1:5556
 ```
 
@@ -646,7 +661,7 @@ python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base
 To compare raw human `.npz` skeleton and retargeted robot together:
 
 ```bash
-python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy
 ```
 
 To test the live-like pipeline:

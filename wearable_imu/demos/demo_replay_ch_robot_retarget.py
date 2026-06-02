@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 import sys
 import time
@@ -38,6 +39,28 @@ _R_HIP, _R_KNEE, _R_ANKLE, _R_TOE = 5, 6, 7, 8
 _PELVIS_CHAIN = (_L_HIP, _SPINE1, _R_HIP)
 _LEFT_CHAIN = (_L_HIP, _L_KNEE, _L_ANKLE, _L_TOE)
 _RIGHT_CHAIN = (_R_HIP, _R_KNEE, _R_ANKLE, _R_TOE)
+_INPUT_JOINT_LABELS = (
+    "Spine1",
+    "L hip",
+    "L knee",
+    "L ankle",
+    "L toe",
+    "R hip",
+    "R knee",
+    "R ankle",
+    "R toe",
+)
+
+
+@dataclass(frozen=True)
+class InputDebugData:
+    """Per-frame source arrays saved before ch_robot retargeting."""
+
+    frame_key: str
+    joint_positions: np.ndarray
+    root_pos_w: np.ndarray | None = None
+    root_quat_wxyz: np.ndarray | None = None
+    available_arrays: tuple[str, ...] = ()
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,6 +81,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--base-height", type=float, default=0.765)
     parser.add_argument("--speed", type=float, default=1.0)
+    parser.add_argument(
+        "--hide-input-data",
+        action="store_true",
+        help="Hide source human joint/root values from the right-side readout.",
+    )
     parser.add_argument("--no-show", action="store_true", help="Convert and print a summary without opening a window.")
     parser.add_argument("--save-output", type=Path, default=None, help="Optional .npz path for qpos/qvel output.")
     return parser.parse_args()
@@ -76,7 +104,42 @@ def _save_output(path: Path, *, qpos: np.ndarray, qvel: np.ndarray, timestamps_s
     print(f"Saved ch_robot replay: {path}")
 
 
-def _print_summary(args: argparse.Namespace, points: np.ndarray, qpos: np.ndarray, qvel: np.ndarray, fps: float) -> None:
+def _load_input_debug(path: Path, *, frame_key: str, fallback_points: np.ndarray) -> InputDebugData:
+    """Load source arrays for display; camera JSONL only has converted joints."""
+
+    if path.suffix != ".npz":
+        return InputDebugData(
+            frame_key=frame_key,
+            joint_positions=fallback_points,
+            available_arrays=("converted_camera_joints",),
+        )
+
+    with np.load(path, allow_pickle=True) as data:
+        arrays = tuple(data.files)
+        joint_positions = np.asarray(data[frame_key], dtype=np.float64) if frame_key in data.files else fallback_points
+        root_pos_w = np.asarray(data["root_pos_w"], dtype=np.float64) if "root_pos_w" in data.files else None
+        root_quat_wxyz = (
+            np.asarray(data["root_quat_wxyz"], dtype=np.float64)
+            if "root_quat_wxyz" in data.files
+            else None
+        )
+    return InputDebugData(
+        frame_key=frame_key,
+        joint_positions=joint_positions,
+        root_pos_w=root_pos_w,
+        root_quat_wxyz=root_quat_wxyz,
+        available_arrays=arrays,
+    )
+
+
+def _print_summary(
+    args: argparse.Namespace,
+    points: np.ndarray,
+    qpos: np.ndarray,
+    qvel: np.ndarray,
+    fps: float,
+    input_debug: InputDebugData,
+) -> None:
     print(f"Clip       : {args.clip}")
     print(f"frame key  : {args.frame_key}")
     print(f"frames     : {points.shape[0]}")
@@ -85,7 +148,32 @@ def _print_summary(args: argparse.Namespace, points: np.ndarray, qpos: np.ndarra
     print(f"qvel       : {qvel.shape}")
     print(f"yaw mode   : {args.yaw_mode}")
     print(f"base motion: {args.base_motion}")
+    print("input arrays: " + ", ".join(input_debug.available_arrays))
+    if input_debug.root_pos_w is not None:
+        print(f"root pos   : {input_debug.root_pos_w.shape}")
+    if input_debug.root_quat_wxyz is not None:
+        print(f"root quat  : {input_debug.root_quat_wxyz.shape}")
     print("joint order: " + ", ".join(CH_ROBOT_JOINT_NAMES))
+
+
+def _format_vec(values: np.ndarray) -> str:
+    return f"{values[0]: .2f} {values[1]: .2f} {values[2]: .2f}"
+
+
+def _format_quat(values: np.ndarray) -> str:
+    return f"{values[0]: .2f} {values[1]: .2f} {values[2]: .2f} {values[3]: .2f}"
+
+
+def _input_readout(index: int, input_debug: InputDebugData) -> str:
+    lines = [f"input {input_debug.frame_key} xyz m"]
+    points = input_debug.joint_positions[index]
+    for label, xyz in zip(_INPUT_JOINT_LABELS, points):
+        lines.append(f"{label:>7}: {_format_vec(xyz)}")
+    if input_debug.root_pos_w is not None:
+        lines.extend(("", "root_pos_w xyz", f"{_format_vec(input_debug.root_pos_w[index])}"))
+    if input_debug.root_quat_wxyz is not None:
+        lines.extend(("", "root_quat_wxyz", f"{_format_quat(input_debug.root_quat_wxyz[index])}"))
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -98,8 +186,9 @@ def main() -> None:
         yaw_mode=args.yaw_mode,
     )
     points = clip.joint_positions
+    input_debug = _load_input_debug(args.clip, frame_key=args.frame_key, fallback_points=points)
 
-    _print_summary(args, points, qpos, qvel, clip.fps)
+    _print_summary(args, points, qpos, qvel, clip.fps, input_debug)
     if args.save_output is not None:
         _save_output(
             args.save_output,
@@ -120,7 +209,7 @@ def main() -> None:
     radius = max(0.5 * float(np.max(maxs - mins)), 0.4)
 
     plt.ion()
-    fig = plt.figure(figsize=(9, 8))
+    fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection="3d")
     ax.set_xlabel("x forward (m)")
     ax.set_ylabel("y left (m)")
@@ -131,7 +220,7 @@ def main() -> None:
     ax.set_box_aspect((1.0, 1.0, 1.0))
     ax.set_proj_type("ortho")
     ax.view_init(elev=18, azim=-62)
-    fig.subplots_adjust(bottom=0.20, right=0.72)
+    fig.subplots_adjust(bottom=0.20, right=0.58)
 
     def _mk(color: str, label: str):
         return ax.plot([], [], [], color=color, linewidth=3, marker="o", markersize=5, label=label)[0]
@@ -164,7 +253,8 @@ def main() -> None:
             f"{name.replace('_joint', ''):>15}: {value:7.2f}"
             for name, value in zip(CH_ROBOT_JOINT_NAMES, joints_deg)
         )
-        readout.set_text(f"frame {index + 1}/{n_frames}\nqpos joints deg\n{joint_lines}")
+        input_lines = "" if args.hide_input_data else "\n\n" + _input_readout(index, input_debug)
+        readout.set_text(f"frame {index + 1}/{n_frames}\nqpos joints deg\n{joint_lines}{input_lines}")
         ax.set_title(f"{args.clip.name} -> ch_robot qpos  frame {index + 1}/{n_frames}")
 
     play_ax = fig.add_axes([0.12, 0.06, 0.18, 0.05])

@@ -10,8 +10,8 @@ can be retargeted by the MuJoCo replay script, but they are not accepted by the
 raw human clip player.
 
 Usage:
-  python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz
-  python demos/demo_compare_human_clip_ch_robot.py ../data/human_joint_clip_20260601_231345.npz --human-origin --base-motion root_xy
+  python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz
+  python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --human-origin --base-motion root_xy
 """
 
 from __future__ import annotations
