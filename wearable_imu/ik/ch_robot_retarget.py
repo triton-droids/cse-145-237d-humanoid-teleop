@@ -28,7 +28,7 @@ from scipy.spatial.transform import Rotation
 Vector3 = NDArray[np.float64]
 Side = Literal["left", "right"]
 YawMode = Literal["keep", "strip"]
-BaseMotionMode = Literal["fixed", "root_xy", "root_xyz"]
+BaseMotionMode = Literal["fixed", "root_xy", "root_xy_forward", "root_xyz"]
 
 
 class LegPoseLike(Protocol):
@@ -472,9 +472,15 @@ def base_position_from_joint_points(
     if origin.shape != (3,):
         raise ValueError(f"root_origin must have shape (3,), got {origin.shape}")
 
-    root_delta = HUMAN_TO_ROBOT_FRAME.apply(points[SPINE1_IDX] - origin)
+    root_delta_human = points[SPINE1_IDX] - origin
+    root_delta = HUMAN_TO_ROBOT_FRAME.apply(root_delta_human)
     if base_motion == "root_xy":
         return np.array([root_delta[0], root_delta[1], base_height], dtype=np.float64)
+    if base_motion == "root_xy_forward":
+        return np.array(
+            [root_delta_human[1], -abs(root_delta_human[0]), base_height],
+            dtype=np.float64,
+        )
     if base_motion == "root_xyz":
         return np.array(
             [root_delta[0], root_delta[1], base_height + root_delta[2]],

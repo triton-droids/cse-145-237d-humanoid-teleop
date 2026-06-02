@@ -49,6 +49,10 @@ CH_ROBOT_BRANCH_PATH = "holosoma-main/src/holosoma_retargeting/holosoma_retarget
 DEFAULT_MODEL_CACHE = PROJECT_ROOT / ".cache" / "ch_robot_model"
 FLOOR_TEXTURE_NAME = "floor_grid_texture"
 FLOOR_MATERIAL_NAME = "floor_grid"
+FOOT_SOLE_VISUAL_FIXES = {
+    "left_foot": ("left_foot_sole_visual", "right_foot_sole_visual"),
+    "right_foot": ("right_foot_sole_visual", "left_foot_sole_visual"),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,8 +65,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--yaw-mode", choices=("keep", "strip"), default="keep")
     parser.add_argument(
         "--base-motion",
-        choices=("root_xy", "fixed", "root_xyz"),
-        default="root_xy",
+        choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+        default="root_xy_forward",
         help="How human root translation drives the MuJoCo freejoint base.",
     )
     parser.add_argument("--base-height", type=float, default=0.765)
@@ -134,7 +138,7 @@ def ensure_ch_robot_model(model_dir: Path, *, refresh: bool = False) -> Path:
 
 
 def ensure_visible_floor(xml_path: Path) -> None:
-    """Ensure the cached ch_robot MJCF has a visible checker floor plane."""
+    """Ensure the cached ch_robot MJCF has viewer-only visual patches."""
 
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -190,8 +194,34 @@ def ensure_visible_floor(xml_path: Path) -> None:
         }
     )
 
+    ensure_foot_sole_visuals(root)
+
     ET.indent(tree, space="  ")
     tree.write(xml_path, encoding="utf-8", xml_declaration=False)
+
+
+def ensure_foot_sole_visuals(root: ET.Element) -> None:
+    """Patch swapped ch_robot sole visual meshes in the cached MJCF.
+
+    The Holosoma XML offsets the sole meshes back under each foot, but the
+    left/right sole STL geometry is visually mirrored.  Swapping the visual
+    geoms and clearing those offsets keeps the physics untouched while making
+    the displayed soles match the displayed feet.
+    """
+
+    for body_name, (current_mesh, corrected_mesh) in FOOT_SOLE_VISUAL_FIXES.items():
+        body = root.find(f".//body[@name='{body_name}']")
+        if body is None:
+            continue
+
+        sole_geom = body.find(f"./geom[@mesh='{current_mesh}']")
+        if sole_geom is None:
+            sole_geom = body.find(f"./geom[@mesh='{corrected_mesh}']")
+        if sole_geom is None:
+            continue
+
+        sole_geom.attrib["mesh"] = corrected_mesh
+        sole_geom.attrib.pop("pos", None)
 
 
 def _find_named(parent: ET.Element, tag: str, name: str) -> ET.Element | None:

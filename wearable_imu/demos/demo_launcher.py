@@ -260,8 +260,8 @@ DEMOS: tuple[DemoSpec, ...] = (
                 key="base_motion",
                 label="Base motion",
                 flag="--base-motion",
-                choices=("root_xy", "fixed", "root_xyz"),
-                default="root_xy",
+                choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+                default="root_xy_forward",
             ),
         ),
         fields=(
@@ -300,8 +300,8 @@ DEMOS: tuple[DemoSpec, ...] = (
                 key="base_motion",
                 label="Base motion",
                 flag="--base-motion",
-                choices=("root_xy", "fixed", "root_xyz"),
-                default="root_xy",
+                choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+                default="root_xy_forward",
             ),
         ),
         fields=(
@@ -339,8 +339,8 @@ DEMOS: tuple[DemoSpec, ...] = (
                 key="base_motion",
                 label="Base motion",
                 flag="--base-motion",
-                choices=("root_xy", "fixed", "root_xyz"),
-                default="root_xy",
+                choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+                default="root_xy_forward",
             ),
         ),
         fields=(
@@ -399,8 +399,8 @@ DEMOS: tuple[DemoSpec, ...] = (
                 key="base_motion",
                 label="Base motion",
                 flag="--base-motion",
-                choices=("root_xy", "fixed", "root_xyz"),
-                default="root_xy",
+                choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+                default="root_xy_forward",
             ),
         ),
         fields=(

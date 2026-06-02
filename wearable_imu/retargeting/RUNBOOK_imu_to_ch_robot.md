@@ -92,6 +92,7 @@ RightUpLeg, RightLeg, RightFoot, RightToeBase
 Recorded replay and ZMQ mock-live support:
 
 ```bash
+--base-motion root_xy_forward
 --base-motion root_xy
 --base-motion fixed
 --base-motion root_xyz
@@ -100,9 +101,10 @@ Recorded replay and ZMQ mock-live support:
 Meaning:
 
 ```text
-root_xy  : Use input root/pelvis horizontal displacement to move the MuJoCo freejoint across the floor. Recommended default.
-fixed    : Keep the base fixed and only inspect leg retargeting. The robot walks in place.
-root_xyz : Use input root/pelvis x/y/z displacement. Only use this if the source has reliable vertical root motion.
+root_xy_forward : Demo-friendly forward-walking mode. It preserves lateral motion and uses forward distance so the robot does not appear to walk backward when a clip doubles back.
+root_xy         : Raw input root/pelvis horizontal displacement in the ch_robot frame.
+fixed           : Keep the base fixed and only inspect leg retargeting. The robot walks in place.
+root_xyz        : Raw input root/pelvis x/y/z displacement. Only use this if the source has reliable vertical root motion.
 ```
 
 Frame convention:
@@ -120,7 +122,7 @@ ch_robot/MuJoCo frame.
 First run a no-window smoke test:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy_forward
 ```
 
 Expected summary:
@@ -130,7 +132,7 @@ source     : smplh_camera_jsonl
 frames     : 149
 qpos       : (149, 17)
 qvel       : (149, 16)
-base motion: root_xy
+base motion: root_xy_forward
 MuJoCo nq  : 17
 MuJoCo nu  : 10
 ```
@@ -138,7 +140,7 @@ MuJoCo nu  : 10
 Open the MuJoCo viewer:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy_forward
 ```
 
 On macOS, MuJoCo passive viewer needs `mjpython`. The script should relaunch
@@ -146,7 +148,7 @@ itself with `mjpython` automatically. If you still see
 `launch_passive requires mjpython`, run:
 
 ```bash
-mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy_forward
 ```
 
 ## 6. Offline MuJoCo Visualization: Recorded IMU NPZ
@@ -154,13 +156,13 @@ mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --ba
 No-window smoke test:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --no-show --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --no-show --base-motion root_xy_forward
 ```
 
 Open the viewer:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy_forward
 ```
 
 If you only want in-place leg motion:
@@ -172,14 +174,14 @@ python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion fix
 Change playback speed:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy --speed 0.5
-python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy --speed 2.0
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy_forward --speed 0.5
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy_forward --speed 2.0
 ```
 
 Disable looping:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy --no-loop
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy_forward --no-loop
 ```
 
 ## 7. Play a Human Joint Clip
@@ -230,24 +232,24 @@ both child demos and stops both when either window closes.
 Basic before/after comparison:
 
 ```bash
-python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy_forward
 ```
 
 Show the human skeleton in pelvis-origin coordinates while the robot uses
-`root_xy` base motion:
+`root_xy_forward` base motion:
 
 ```bash
 python demos/demo_compare_human_clip_ch_robot.py \
   ../data/demo_1.npz \
   --human-origin \
-  --base-motion root_xy
+  --base-motion root_xy_forward
 ```
 
 Slow down or speed up both windows together:
 
 ```bash
-python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy --speed 0.5
-python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy --speed 2.0
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy_forward --speed 0.5
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy_forward --speed 2.0
 ```
 
 No-window smoke test for the combined command:
@@ -255,7 +257,7 @@ No-window smoke test for the combined command:
 ```bash
 python demos/demo_compare_human_clip_ch_robot.py \
   ../data/demo_1.npz \
-  --base-motion root_xy \
+  --base-motion root_xy_forward \
   --no-show
 ```
 
@@ -274,32 +276,32 @@ retargeting input data before conversion: source human joint `xyz` values,
 Camera JSONL:
 
 ```bash
-python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --base-motion root_xy_forward
 ```
 
 IMU NPZ:
 
 ```bash
-python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy_forward
 ```
 
 This is the command for the view with the human skeleton and numeric readout on
 the right:
 
 ```bash
-python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy_forward
 ```
 
 Hide the source input data and show only ch_robot joint angles:
 
 ```bash
-python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy --hide-input-data
+python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz --base-motion root_xy_forward --hide-input-data
 ```
 
 Convert only and print a summary:
 
 ```bash
-python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
+python demos/demo_replay_ch_robot_retarget.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy_forward
 ```
 
 Save the converted `qpos`/`qvel` as a replay NPZ:
@@ -307,7 +309,7 @@ Save the converted `qpos`/`qvel` as a replay NPZ:
 ```bash
 python demos/demo_replay_ch_robot_retarget.py \
   ../data/smplh_capture_3.jsonl \
-  --base-motion root_xy \
+  --base-motion root_xy_forward \
   --save-output ../data/ch_robot_replay_qpos_smplh_capture_3.npz
 ```
 
@@ -328,7 +330,7 @@ Terminal 1: start the MuJoCo ZMQ subscriber.
 ```bash
 cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
 conda activate hsretargeting
-python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy
+python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy_forward
 ```
 
 Terminal 2: start the 50 Hz publisher.
@@ -349,7 +351,7 @@ python demos/demo_mujoco_ch_robot_zmq.py \
   --no-show \
   --max-frames 10 \
   --status-every 1 \
-  --base-motion root_xy
+  --base-motion root_xy_forward
 ```
 
 Terminal 2:
@@ -368,7 +370,7 @@ python demos/demo_zmq_human_joint_publisher.py \
 Expected subscriber output:
 
 ```text
-base     : root_xy
+base     : root_xy_forward
 received=1 frame=0
 ...
 received=10 frame=9
@@ -380,7 +382,7 @@ Converted 10 ZMQ frames.
 Terminal 1:
 
 ```bash
-python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy
+python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy_forward
 ```
 
 Terminal 2:
@@ -472,7 +474,7 @@ For replay, MuJoCo replay, and ZMQ subscriber entries, the launcher exposes a
 `Base motion` option:
 
 ```text
-root_xy, fixed, root_xyz
+root_xy_forward, root_xy, fixed, root_xyz
 ```
 
 ## 14. Model Cache and Floor
@@ -490,8 +492,8 @@ The cache is created automatically on first run. To force re-extraction:
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --refresh-model
 ```
 
-The cached MuJoCo XML is automatically patched with a checker floor. To inspect
-the cached XML:
+The cached MuJoCo XML is automatically patched with a checker floor and a
+viewer-only left/right foot-sole visual correction. To inspect the cached XML:
 
 ```bash
 python -c "from pathlib import Path; print(Path('.cache/ch_robot_model/ch_robot_10dof.xml').read_text()[:1000])"
@@ -526,7 +528,7 @@ python -m pytest -q
 MuJoCo no-window smoke test:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy_forward
 ```
 
 ZMQ no-window smoke test, Terminal 1:
@@ -537,7 +539,7 @@ python demos/demo_mujoco_ch_robot_zmq.py \
   --no-show \
   --max-frames 10 \
   --status-every 1 \
-  --base-motion root_xy
+  --base-motion root_xy_forward
 ```
 
 ZMQ no-window smoke test, Terminal 2:
@@ -560,13 +562,13 @@ python demos/demo_zmq_human_joint_publisher.py \
 On macOS, run the viewer with `mjpython`:
 
 ```bash
-mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+mjpython demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy_forward
 ```
 
 For the ZMQ subscriber:
 
 ```bash
-mjpython demos/demo_mujoco_ch_robot_zmq.py --base-motion root_xy
+mjpython demos/demo_mujoco_ch_robot_zmq.py --base-motion root_xy_forward
 ```
 
 ### The Robot Still Walks in Place
@@ -574,16 +576,17 @@ mjpython demos/demo_mujoco_ch_robot_zmq.py --base-motion root_xy
 Confirm you are not using fixed base motion:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy_forward
 ```
 
 The summary should include:
 
 ```text
-base motion: root_xy
+base motion: root_xy_forward
 ```
 
-If the input root/pelvis itself does not move, `root_xy` cannot move the robot.
+If the input root/pelvis itself does not move, `root_xy_forward` and `root_xy`
+cannot move the robot.
 Check whether the camera or IMU data contains root displacement.
 
 ### ZMQ Publisher Bind Error
@@ -599,7 +602,7 @@ commands in your own terminal should normally avoid the restriction. You can
 also use a different port:
 
 ```bash
-python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5570 --base-motion root_xy
+python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5570 --base-motion root_xy_forward
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --endpoint tcp://127.0.0.1:5570 --fps 50
 ```
 
@@ -615,7 +618,7 @@ tcp://127.0.0.1:5556
 You can also verify with the no-window path:
 
 ```bash
-python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5565 --no-show --max-frames 10 --status-every 1 --base-motion root_xy
+python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5565 --no-show --max-frames 10 --status-every 1 --base-motion root_xy_forward
 ```
 
 ### MuJoCo Model Cache Is Broken or Floor Is Missing
@@ -623,7 +626,7 @@ python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5565 --no-sh
 Re-extract the model:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --refresh-model --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --refresh-model --base-motion root_xy_forward
 ```
 
 ### Import Cannot Find `ik`
@@ -649,25 +652,25 @@ git pull --ff-only origin imu-retarget
 source /Users/yanglin/.holosoma_deps/miniconda3/etc/profile.d/conda.sh
 conda activate hsretargeting
 cd wearable_imu
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy_forward
 ```
 
 If the no-window check passes, open visualization:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy_forward
 ```
 
 To compare raw human `.npz` skeleton and retargeted robot together:
 
 ```bash
-python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy_forward
 ```
 
 To test the live-like pipeline:
 
 ```bash
-python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy
+python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy_forward
 ```
 
 In another terminal:

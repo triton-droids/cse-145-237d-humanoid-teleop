@@ -75,8 +75,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--yaw-mode", choices=("keep", "strip"), default="keep")
     parser.add_argument(
         "--base-motion",
-        choices=("root_xy", "fixed", "root_xyz"),
-        default="root_xy",
+        choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+        default="root_xy_forward",
         help="How human root translation drives the ch_robot freejoint base.",
     )
     parser.add_argument("--base-height", type=float, default=0.765)

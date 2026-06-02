@@ -219,6 +219,32 @@ def test_root_xy_base_motion_drives_freejoint_translation_and_velocity() -> None
     )
 
 
+def test_root_xy_forward_base_motion_keeps_forward_displacement_positive() -> None:
+    points = np.stack([_neutral_joint_positions(), _neutral_joint_positions()])
+    points[1] += np.array([-0.12, -0.04, 0.03], dtype=np.float64)
+    clip = HumanJointClip(
+        joint_positions=points,
+        root_quat_wxyz=None,
+        timestamps_s=np.array([0.0, 0.02]),
+        fps=50.0,
+        joint_names=HUMAN_JOINT_NAMES,
+        frame_key="joint_pos_origin",
+    )
+
+    qpos, qvel = human_joint_clip_to_qpos_qvel(clip, base_motion="root_xy_forward")
+
+    np.testing.assert_allclose(qpos[1, :3], [-0.04, -0.12, BASE_HEIGHT_M])
+    np.testing.assert_allclose(qvel[1, :3], [-2.0, -6.0, 0.0])
+    np.testing.assert_allclose(
+        base_position_from_joint_points(
+            points[1],
+            root_origin=points[0, 0],
+            base_motion="root_xy_forward",
+        ),
+        [-0.04, -0.12, BASE_HEIGHT_M],
+    )
+
+
 def test_load_actual_recorded_clip_if_available() -> None:
     path = REPO_ROOT / "data" / "human_joint_clip_20260601_231345.npz"
     if not path.exists():
@@ -278,7 +304,25 @@ def test_zmq_human_joint_frame_roundtrip() -> None:
 
 def test_ensure_visible_floor_adds_checker_plane(tmp_path: Path) -> None:
     xml_path = tmp_path / "model.xml"
-    xml_path.write_text("<mujoco model=\"tiny\"><worldbody/></mujoco>", encoding="utf-8")
+    xml_path.write_text(
+        """
+        <mujoco model="tiny">
+          <asset>
+            <mesh name="left_foot_sole_visual" file="visual/left_foot_sole.stl"/>
+            <mesh name="right_foot_sole_visual" file="visual/right_foot_sole.stl"/>
+          </asset>
+          <worldbody>
+            <body name="left_foot">
+              <geom class="visual" mesh="left_foot_sole_visual" pos="0.30958 0 0"/>
+            </body>
+            <body name="right_foot">
+              <geom class="visual" mesh="right_foot_sole_visual" pos="-0.310851 0 0"/>
+            </body>
+          </worldbody>
+        </mujoco>
+        """,
+        encoding="utf-8",
+    )
 
     ensure_visible_floor(xml_path)
     root = ET.parse(xml_path).getroot()
@@ -293,6 +337,13 @@ def test_ensure_visible_floor_adds_checker_plane(tmp_path: Path) -> None:
     assert ground is not None
     assert ground.attrib["type"] == "plane"
     assert ground.attrib["material"] == FLOOR_MATERIAL_NAME
+
+    left_sole = root.find(".//body[@name='left_foot']/geom[@mesh='right_foot_sole_visual']")
+    right_sole = root.find(".//body[@name='right_foot']/geom[@mesh='left_foot_sole_visual']")
+    assert left_sole is not None
+    assert "pos" not in left_sole.attrib
+    assert right_sole is not None
+    assert "pos" not in right_sole.attrib
 
 
 def test_retargeted_qpos_matches_repo_root_contract_validator() -> None:

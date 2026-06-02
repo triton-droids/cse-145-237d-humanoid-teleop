@@ -72,11 +72,11 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 |---|---|---|
 | `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). Includes Calibrate, Clear calibration, Record, and Stop rec buttons. In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--record-duration-s`, `--record-fps`, `--record-output` |
 | `demo_live_retarget.py` | Headless live Plan A bridge: IMU packets -> calibrated lower-body skeleton -> ch_robot `qpos[17]` and `qvel[16]`, emitted as JSON lines over stdout or UDP. | `--config {thighs,shanks,full}`, `--output {stdout,udp,none}`, `--target-host`, `--target-port`, `--fps`, `--yaw-mode {keep,strip}` |
-| `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` or camera `.jsonl` clip through Plan A, visualize the skeleton, and show source human/root values plus resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--hide-input-data`, `--no-show` |
-| `demo_mujoco_ch_robot_replay.py` | Replay a recorded IMU/camera handoff clip or saved ch_robot qpos replay on the real Holosoma `ch_robot_10dof.xml` MuJoCo model. Auto-extracts XML/meshes from `retargeting_holosoma` into `.cache/`. | positional `input`, `--speed`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--no-show`, `--refresh-model` |
-| `demo_compare_human_clip_ch_robot.py` | Open the raw human `.npz` skeleton player and retargeted ch_robot MuJoCo replay together for before/after inspection. | positional `clip`, `--speed`, `--human-origin`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--no-show` |
+| `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` or camera `.jsonl` clip through Plan A, visualize the skeleton, and show source human/root values plus resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--hide-input-data`, `--no-show` |
+| `demo_mujoco_ch_robot_replay.py` | Replay a recorded IMU/camera handoff clip or saved ch_robot qpos replay on the real Holosoma `ch_robot_10dof.xml` MuJoCo model. Auto-extracts XML/meshes from `retargeting_holosoma` into `.cache/`. | positional `input`, `--speed`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--no-show`, `--refresh-model` |
+| `demo_compare_human_clip_ch_robot.py` | Open the raw human `.npz` skeleton player and retargeted ch_robot MuJoCo replay together for before/after inspection. | positional `clip`, `--speed`, `--human-origin`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--no-show` |
 | `demo_zmq_human_joint_publisher.py` | Publish a recorded `human_joint_clip_*.npz` or camera `.jsonl` as mock-live 9-joint frames over ZeroMQ at 50 Hz or a chosen rate. | positional `clip`, `--endpoint`, `--fps`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--max-frames` |
-| `demo_mujoco_ch_robot_zmq.py` | Subscribe to mock-live ZMQ human joint frames, convert each frame to ch_robot `qpos/qvel`, and update the real MuJoCo robot online. | `--endpoint`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy,fixed,root_xyz}`, `--no-show`, `--max-frames` |
+| `demo_mujoco_ch_robot_zmq.py` | Subscribe to mock-live ZMQ human joint frames, convert each frame to ch_robot `qpos/qvel`, and update the real MuJoCo robot online. | `--endpoint`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--no-show`, `--max-frames` |
 | `demo_record_human_joint_clip.py` | Offline recorder that saves ML retargeting joint positions (`Spine1`, hips, knees, ankles, and generated toe points) to `.npz`. | `--config {thighs,shanks,full}`, `--duration-s`, `--fps`, `--output` |
 | `demo_udp_quaternion_receiver.py` | Text-only packet monitor: per-segment rate, age, receive/sensor jitter, drops, raw quaternions. | `--host`, `--port`, `--max-age-ms` |
 | `demo_udp_latency_ping.py` | Round-trip UDP latency test to one node. | positional `esp32_ip`, `--port`, `--count`, `--interval-ms`, `--timeout-ms` |
@@ -103,10 +103,10 @@ python demos/demo_live_retarget.py --config full --output udp --target-host 127.
 python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz
 
 # Run the recorded IMU handoff on the actual ch_robot MuJoCo model from retargeting_holosoma
-python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/demo_1.npz --base-motion root_xy_forward
 
 # Open raw human skeleton and retargeted ch_robot MuJoCo replay together
-python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy
+python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --base-motion root_xy_forward
 
 # Or run a saved qpos/qvel replay on the actual ch_robot MuJoCo model
 python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_20260601_231345.npz
@@ -118,10 +118,10 @@ python demos/demo_zmq_human_joint_publisher.py ../data/demo_1.npz --fps 50
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --fps 50
 
 # In another terminal, consume that ZMQ stream and drive the actual ch_robot MuJoCo model
-python demos/demo_mujoco_ch_robot_zmq.py --base-motion root_xy
+python demos/demo_mujoco_ch_robot_zmq.py --base-motion root_xy_forward
 
 # Base motion note:
-#   root_xy/root_xyz need a live root position source, such as the mock-live
+#   root_xy_forward/root_xy/root_xyz need a live root position source, such as the mock-live
 #   recorded joint stream above or a future camera/VIO/foot-odometry source.
 #   The direct ESP32 IMU live bridge is orientation-only today, so its base
 #   intentionally stays fixed.

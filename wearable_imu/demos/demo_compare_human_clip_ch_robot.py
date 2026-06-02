@@ -11,7 +11,7 @@ raw human clip player.
 
 Usage:
   python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz
-  python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --human-origin --base-motion root_xy
+  python demos/demo_compare_human_clip_ch_robot.py ../data/demo_1.npz --human-origin --base-motion root_xy_forward
 """
 
 from __future__ import annotations
@@ -48,8 +48,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--yaw-mode", choices=("keep", "strip"), default="keep")
     parser.add_argument(
         "--base-motion",
-        choices=("root_xy", "fixed", "root_xyz"),
-        default="root_xy",
+        choices=("root_xy_forward", "root_xy", "fixed", "root_xyz"),
+        default="root_xy_forward",
         help="How human root translation drives the MuJoCo freejoint base.",
     )
     parser.add_argument("--base-height", type=float, default=0.765)

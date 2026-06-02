@@ -207,11 +207,12 @@ use root translation from the recording so the robot moves across the floor
 instead of stepping in place:
 
 ```bash
-python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy
+python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --base-motion root_xy_forward
 ```
 
-Use `--base-motion fixed` for the older in-place behavior, or `root_xyz` if the
-source has usable vertical root motion.
+Use `--base-motion root_xy` for raw root trajectory replay, `fixed` for the
+older in-place behavior, or `root_xyz` if the source has usable vertical root
+motion.
 
 The direct ESP32 IMU live bridge is still orientation-only: it can retarget
 joint rotations live, but it needs a separate root-position source before it
