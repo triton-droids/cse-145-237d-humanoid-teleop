@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import queue
 import shlex
@@ -21,6 +22,34 @@ from tkinter import messagebox, ttk
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ANSI_CLEAR_HOME = "\033[2J\033[H"
+
+
+def _pick_font(root: tk.Misc, candidates: tuple[str, ...], fallback: str) -> str:
+    """Return the first installed font family, else a Tk-guaranteed fallback."""
+    try:
+        import tkinter.font as tkfont
+
+        available = {name.lower() for name in tkfont.families(root)}
+    except Exception:
+        return fallback
+    for name in candidates:
+        if name.lower() in available:
+            return name
+    return fallback
+
+
+# Cross-platform font families. The originals were macOS-only (Avenir Next /
+# Menlo), so on Linux/Windows Tk silently fell back to a tiny default font,
+# which looked low-resolution. These are resolved at runtime to whatever is
+# actually installed.
+_UI_FONT_CANDIDATES = (
+    "Avenir Next", "Segoe UI", "Cantarell", "Ubuntu", "Noto Sans",
+    "DejaVu Sans", "Helvetica Neue", "Arial", "Helvetica",
+)
+_MONO_FONT_CANDIDATES = (
+    "Menlo", "Cascadia Mono", "Consolas", "Ubuntu Mono", "Noto Sans Mono",
+    "DejaVu Sans Mono", "Liberation Mono", "Courier New", "Courier",
+)
 
 
 @dataclass(frozen=True)
@@ -206,8 +235,45 @@ class DemoLauncher(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Humanoid Teleop Demo Launcher")
-        self.geometry("1040x720")
-        self.minsize(900, 600)
+
+        # --- HiDPI / font setup --------------------------------------------
+        # Tk does not auto-detect HiDPI on Linux, so on scaled displays the UI
+        # renders at 1x and looks tiny/blurry. Derive a scale factor from the
+        # real screen DPI and apply it to Tk's scaling plus our geometry/fonts.
+        try:
+            dpi = self.winfo_fpixels("1i")  # pixels per inch
+        except tk.TclError:
+            dpi = 96.0
+        scale = dpi / 96.0
+        # Some desktops (GNOME fractional scaling, Wayland) keep the X DPI at 96
+        # and expose the scale via env vars instead, which leaves Tk tiny. Honor
+        # those, and allow a manual override, so the launcher matches the rest of
+        # the desktop. Set HUMANOID_UI_SCALE=1.5 (etc.) to force a value.
+        for env_var in ("HUMANOID_UI_SCALE", "GDK_SCALE", "QT_SCALE_FACTOR"):
+            raw = os.environ.get(env_var)
+            if raw:
+                try:
+                    scale = max(scale, float(raw))
+                    break
+                except ValueError:
+                    pass
+        self.ui_scale = max(1.0, min(scale, 3.0))
+        # Tk 'scaling' is points->pixels; 1 pt = 1/72 in. Setting it makes Tk
+        # size point-based fonts/widgets for the effective DPI.
+        self.tk.call("tk", "scaling", self.ui_scale * 96.0 / 72.0)
+
+        self.ui_font = _pick_font(self, _UI_FONT_CANDIDATES, "TkDefaultFont")
+        self.mono_font = _pick_font(self, _MONO_FONT_CANDIDATES, "TkFixedFont")
+
+        # Tk 'scaling' already enlarges point-sized fonts for the real DPI, so
+        # font point sizes stay as-is. _px scales explicit *pixel* quantities
+        # (padding, geometry, wraplengths) that Tk would otherwise leave at 1x.
+        def _px(pixels: float) -> int:
+            return max(1, int(round(pixels * self.ui_scale)))
+
+        self._px = _px
+        self.geometry(f"{_px(1040)}x{_px(720)}")
+        self.minsize(_px(900), _px(600))
 
         self.output_queue: queue.Queue[str] = queue.Queue()
         self.process: subprocess.Popen[str] | None = None
@@ -230,26 +296,28 @@ class DemoLauncher(tk.Tk):
         except tk.TclError:
             pass
 
-        style.configure(".", font=("Avenir Next", 12), background="#f3f4f1", foreground="#1f2421")
+        ui = self.ui_font
+        mono = self.mono_font
+        style.configure(".", font=(ui, 12), background="#f3f4f1", foreground="#1f2421")
         style.configure("Root.TFrame", background="#f3f4f1")
         style.configure("Panel.TFrame", background="#ffffff", relief="flat")
         style.configure("Sidebar.TFrame", background="#e8ebe4")
-        style.configure("Header.TLabel", font=("Avenir Next", 24, "bold"), background="#f3f4f1", foreground="#1d2620")
+        style.configure("Header.TLabel", font=(ui, 24, "bold"), background="#f3f4f1", foreground="#1d2620")
         style.configure("Subtle.TLabel", background="#ffffff", foreground="#5f6860")
-        style.configure("PanelTitle.TLabel", font=("Avenir Next", 18, "bold"), background="#ffffff", foreground="#1d2620")
-        style.configure("Section.TLabel", font=("Avenir Next", 12, "bold"), background="#ffffff", foreground="#384139")
-        style.configure("SidebarTitle.TLabel", font=("Avenir Next", 13, "bold"), background="#e8ebe4", foreground="#1d2620")
+        style.configure("PanelTitle.TLabel", font=(ui, 18, "bold"), background="#ffffff", foreground="#1d2620")
+        style.configure("Section.TLabel", font=(ui, 12, "bold"), background="#ffffff", foreground="#384139")
+        style.configure("SidebarTitle.TLabel", font=(ui, 13, "bold"), background="#e8ebe4", foreground="#1d2620")
         style.configure("Status.TLabel", background="#dce8d9", foreground="#1f5b35", padding=(12, 5))
-        style.configure("Command.TLabel", background="#eef1ec", foreground="#28322b", padding=(10, 8), font=("Menlo", 11))
+        style.configure("Command.TLabel", background="#eef1ec", foreground="#28322b", padding=(10, 8), font=(mono, 11))
         style.configure("TEntry", fieldbackground="#ffffff", bordercolor="#cbd2c8", lightcolor="#cbd2c8", darkcolor="#cbd2c8")
-        style.configure("Primary.TButton", font=("Avenir Next", 12, "bold"), background="#23614a", foreground="#ffffff", padding=(14, 8))
+        style.configure("Primary.TButton", font=(ui, 12, "bold"), background="#23614a", foreground="#ffffff", padding=(14, 8))
         style.map("Primary.TButton", background=[("active", "#1d513d"), ("pressed", "#163d2f")])
         style.configure("Secondary.TButton", background="#e4e8e1", foreground="#243027", padding=(14, 8))
         style.map("Secondary.TButton", background=[("active", "#d8dfd4"), ("pressed", "#cbd5c7")])
         style.configure("Danger.TButton", background="#ead9d3", foreground="#733221", padding=(14, 8))
         style.map("Danger.TButton", background=[("active", "#dfc9c0"), ("pressed", "#d0b2a8")])
         # Segmented-control look for per-demo option choices (Toolbutton radios).
-        style.configure("Option.Toolbutton", font=("Avenir Next", 11), padding=(14, 6), background="#e4e8e1", foreground="#243027")
+        style.configure("Option.Toolbutton", font=(ui, 11), padding=(14, 6), background="#e4e8e1", foreground="#243027")
         style.map(
             "Option.Toolbutton",
             background=[("selected", "#23614a"), ("active", "#d8dfd4")],
@@ -292,7 +360,7 @@ class DemoLauncher(tk.Tk):
             relief="flat",
             selectbackground="#23614a",
             selectforeground="#ffffff",
-            font=("Avenir Next", 12),
+            font=(self.ui_font, 12),
         )
         self.demo_listbox.pack(fill="both", expand=True)
         for demo in DEMOS:
@@ -311,9 +379,9 @@ class DemoLauncher(tk.Tk):
 
         self.title_label = ttk.Label(details, style="PanelTitle.TLabel")
         self.title_label.grid(row=0, column=0, sticky="w")
-        self.description_label = ttk.Label(details, wraplength=650, justify="left", style="Subtle.TLabel")
+        self.description_label = ttk.Label(details, wraplength=self._px(650), justify="left", style="Subtle.TLabel")
         self.description_label.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        self.notes_label = ttk.Label(details, wraplength=650, justify="left", style="Subtle.TLabel")
+        self.notes_label = ttk.Label(details, wraplength=self._px(650), justify="left", style="Subtle.TLabel")
         self.notes_label.grid(row=2, column=0, sticky="ew", pady=(6, 0))
 
         # Per-demo option groups (radio buttons) are rebuilt on demo selection.
@@ -345,7 +413,7 @@ class DemoLauncher(tk.Tk):
         command_frame = ttk.Frame(controls, padding=(0, 12, 0, 0), style="Root.TFrame")
         command_frame.grid(row=1, column=0, sticky="ew")
         ttk.Label(command_frame, text="Command", style="Section.TLabel").pack(anchor="w", pady=(0, 6))
-        self.command_label = ttk.Label(command_frame, wraplength=720, justify="left", style="Command.TLabel")
+        self.command_label = ttk.Label(command_frame, wraplength=self._px(720), justify="left", style="Command.TLabel")
         self.command_label.pack(anchor="w", fill="x")
 
         output_frame = ttk.Frame(controls, padding=(0, 12, 0, 0), style="Root.TFrame")
@@ -357,7 +425,7 @@ class DemoLauncher(tk.Tk):
             terminal,
             wrap="word",
             height=20,
-            font=("Menlo", 11),
+            font=(self.mono_font, 11),
             background="#111814",
             foreground="#dbe7de",
             insertbackground="#dbe7de",
