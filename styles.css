@@ -531,6 +531,35 @@ code, pre { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, 
 }
 .stage .stage-num { margin-bottom: 0; }
 
+/* ---------- Future Work cards ---------- */
+.stage-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--warn);
+  background: rgba(247, 201, 72, 0.10);
+  border: 1px solid rgba(247, 201, 72, 0.30);
+  border-radius: 999px;
+}
+.stage-future { border-style: dashed; }
+.stage-future .stage-icon {
+  color: var(--warn);
+  background: linear-gradient(135deg, rgba(247, 201, 72, 0.14), rgba(247, 201, 72, 0.06));
+  border-color: rgba(247, 201, 72, 0.30);
+}
+.stage-future:hover {
+  border-color: rgba(247, 201, 72, 0.55);
+  border-style: solid;
+}
+.stage-future:hover .stage-icon {
+  color: var(--warn);
+  border-color: rgba(247, 201, 72, 0.55);
+}
+
 /* ---------- Link card icon (SVG version) ---------- */
 .link-icon { color: var(--accent); }
 .link-icon svg { width: 22px; height: 22px; }

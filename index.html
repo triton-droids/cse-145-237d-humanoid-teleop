@@ -20,6 +20,7 @@
       <nav class="nav-links">
         <a href="#abstract">Abstract</a>
         <a href="#pipeline">Pipeline</a>
+        <a href="#future">Future</a>
         <a href="#team">Team</a>
         <a href="#materials">Materials</a>
         <a class="nav-cta" href="https://github.com/triton-droids/cse-145-237d-humanoid-teleop" target="_blank" rel="noopener">GitHub →</a>
@@ -35,10 +36,10 @@
           <div class="eyebrow">CSE 145 / 237D · UC San Diego · Spring 2026</div>
           <h1>Humanoid Teleop</h1>
           <p class="lede">
-            A full-stack pipeline that lets a humanoid robot imitate lower-body
-            human motion — from wearable IMU nodes and a depth-camera baseline,
-            through calibration, IK, and retargeting, into a reinforcement-learning
-            motion-tracking policy in Isaac Lab.
+            A wearable lower-body motion-capture pipeline — from BNO085 IMU nodes
+            and a depth-camera baseline, through calibration and inverse kinematics,
+            into 9-DOF retargeted joint trajectories on the Triton humanoid model.
+            RL policy training and sim-to-real deployment are next.
           </p>
           <div class="hero-ctas">
             <a class="btn btn-primary" href="#pipeline">See the pipeline</a>
@@ -237,7 +238,7 @@
         <div class="section-head">
           <span class="kicker">02 — Pipeline</span>
           <h2>From human motion to robot motion</h2>
-          <p class="section-sub">Each stage of the system, and where the code lives.</p>
+          <p class="section-sub">What we built this quarter — each stage links to the code on GitHub.</p>
         </div>
 
         <div class="stage-grid">
@@ -314,8 +315,21 @@
             <p>Map human joint trajectories onto the Triton humanoid via the <em>ch_robot</em> joint-order contract and the Holosoma converter patch.</p>
             <code>retargeting/ →</code>
           </a>
+        </div>
+      </div>
+    </section>
 
-          <a class="stage" href="https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/course-repo-integration/simulation" target="_blank" rel="noopener">
+    <!-- FUTURE WORK -->
+    <section id="future" class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="kicker">03 — Future Work</span>
+          <h2>Where we go next</h2>
+          <p class="section-sub">Course delivery stopped at retargeting. The motion-tracking policy and on-robot deployment are the next milestones.</p>
+        </div>
+
+        <div class="stage-grid stage-grid-future">
+          <a class="stage stage-future" href="https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/course-repo-integration/simulation" target="_blank" rel="noopener">
             <div class="stage-head">
               <div class="stage-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -325,14 +339,14 @@
                   <circle cx="12" cy="12" r="1.2" fill="currentColor"/>
                 </svg>
               </div>
-              <span class="stage-num">05</span>
+              <span class="stage-badge">PLANNED</span>
             </div>
             <h3>RL in Isaac Lab</h3>
-            <p>Humanoid locomotion training extended toward motion tracking — reward shaping, policy training, and simulation-to-simulation validation.</p>
+            <p>Train a humanoid motion-tracking policy in Isaac Lab — reward shaping, policy training, and sim-to-sim validation against the retargeted reference motions.</p>
             <code>simulation/ →</code>
           </a>
 
-          <a class="stage" href="https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/course-repo-integration" target="_blank" rel="noopener">
+          <a class="stage stage-future" href="https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/course-repo-integration" target="_blank" rel="noopener">
             <div class="stage-head">
               <div class="stage-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -347,11 +361,11 @@
                   <line x1="15" y1="20" x2="15" y2="22"/>
                 </svg>
               </div>
-              <span class="stage-num">06</span>
+              <span class="stage-badge">PLANNED</span>
             </div>
             <h3>Sim-to-Real</h3>
-            <p>Deploy the trained motion-tracking policy onto the Triton humanoid. In progress — the final mile of the project.</p>
-            <code>deployment (WIP) →</code>
+            <p>Deploy the trained motion-tracking policy onto the Triton humanoid for real-world lower-body teleoperation.</p>
+            <code>deployment →</code>
           </a>
         </div>
       </div>
@@ -361,7 +375,7 @@
     <section id="team" class="section section-alt">
       <div class="container">
         <div class="section-head">
-          <span class="kicker">03 — Team</span>
+          <span class="kicker">04 — Team</span>
           <h2>Triton Droids</h2>
           <p class="section-sub">UC San Diego · CSE 145 / 237D</p>
         </div>
@@ -411,7 +425,7 @@
     <section id="materials" class="section">
       <div class="container">
         <div class="section-head">
-          <span class="kicker">04 — Materials</span>
+          <span class="kicker">05 — Materials</span>
           <h2>Reports, code, &amp; deliverables</h2>
         </div>
 
