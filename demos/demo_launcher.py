@@ -110,6 +110,18 @@ class Toggle:
 
 
 @dataclass(frozen=True)
+class CommandButton:
+    """A button that writes a line to the running process's stdin.
+
+    Lets a demo expose live controls (e.g. Calibrate / Record / Stop) that the
+    script reads as stdin commands while it runs.
+    """
+
+    label: str
+    command: str  # the line sent to stdin (newline added automatically)
+
+
+@dataclass(frozen=True)
 class DemoSpec:
     key: str
     title: str
@@ -121,6 +133,7 @@ class DemoSpec:
     options: tuple[OptionGroup, ...] = ()
     fields: tuple[Field, ...] = ()
     toggles: tuple[Toggle, ...] = ()
+    command_buttons: tuple[CommandButton, ...] = ()
 
     def command(self, extra_args: tuple[str, ...] = ()) -> list[str]:
         return [sys.executable, "-u", str(self.script), *self.default_args, *extra_args]
@@ -167,11 +180,70 @@ DEMOS: tuple[DemoSpec, ...] = (
         notes="Requires the MuJoCo Python package and display support.",
     ),
     DemoSpec(
+        key="record-human-joints",
+        title="Record Joints (high-rate, no view)",
+        script=PROJECT_ROOT / "demos" / "demo_record_human_joint_clip.py",
+        description="Headless ML clip recorder. No 3D view, so capture reliably hits the full packet rate (~50 fps). Use this for actual data capture.",
+        notes="Stand neutral; it auto-calibrates after a short delay, then records for the duration. Pick the IMU set and options on the right.",
+        options=(
+            OptionGroup(
+                key="config",
+                label="IMU set",
+                flag="--config",
+                choices=("thighs", "shanks", "full"),
+                default="shanks",
+            ),
+        ),
+        fields=(
+            Field("host", "Host", "--host", placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", placeholder="5005"),
+            Field("fps", "FPS", "--fps", placeholder="50"),
+            Field("duration_s", "Seconds", "--duration-s", placeholder="10"),
+            Field("max_age_ms", "Max age ms", "--max-age-ms", placeholder="250"),
+            Field("output", "Output .npz", "--output", placeholder="data/recordings/human_joint_clip.npz"),
+        ),
+        toggles=(
+            Toggle("free_root", "Free-root pelvis / walk (--free-root)", "--free-root"),
+        ),
+    ),
+    DemoSpec(
+        key="record-human-joints-manual",
+        title="Record Joints (manual: calibrate/record/stop)",
+        script=PROJECT_ROOT / "demos" / "demo_record_human_joint_clip.py",
+        description="Headless recorder with manual control. Use the Calibrate / Record / Stop buttons (or type commands in a terminal). Each Stop saves a clip; you can record several.",
+        notes="Click Calibrate (stand neutral), then Record, then Stop. No 3D view, so capture stays at full rate.",
+        default_args=("--manual",),
+        options=(
+            OptionGroup(
+                key="config",
+                label="IMU set",
+                flag="--config",
+                choices=("thighs", "shanks", "full"),
+                default="shanks",
+            ),
+        ),
+        fields=(
+            Field("host", "Host", "--host", placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", placeholder="5005"),
+            Field("fps", "FPS", "--fps", placeholder="50"),
+            Field("max_age_ms", "Max age ms", "--max-age-ms", placeholder="250"),
+            Field("output", "Output .npz", "--output", placeholder="data/recordings/human_joint_clip.npz"),
+        ),
+        toggles=(
+            Toggle("free_root", "Free-root pelvis / walk (--free-root)", "--free-root"),
+        ),
+        command_buttons=(
+            CommandButton("Calibrate", "calibrate"),
+            CommandButton("Record", "record"),
+            CommandButton("Stop", "stop"),
+        ),
+    ),
+    DemoSpec(
         key="partial-imu-live-viewer",
-        title="Partial IMU Viewer + Recorder",
+        title="Live Viewer (setup / calibrate)",
         script=PROJECT_ROOT / "demos" / "demo_partial_imu_live_viewer.py",
-        description="Live lower-body skeleton from real IMU packets, with calibration and ML clip recording controls.",
-        notes="Pick the IMU set on the right, set recording options below, then click Calibrate and Record in the plot window.",
+        description="Live 3D skeleton for checking sensors, mounting, and calibration. Has a Record button too, but for real data prefer the headless recorder above (the 3D view caps capture rate).",
+        notes="Pick the IMU set on the right, then Calibrate in the plot window. Free-root shows a translating pelvis over a floor.",
         options=(
             OptionGroup(
                 key="config",
@@ -184,14 +256,27 @@ DEMOS: tuple[DemoSpec, ...] = (
         fields=(
             Field("host", "Host", "--host", placeholder="0.0.0.0"),
             Field("port", "Port", "--port", placeholder="5005"),
-            Field("record_fps", "Record FPS", "--record-fps", placeholder="50"),
             Field("draw_fps", "Draw FPS", "--draw-fps", placeholder="10"),
+            Field("record_fps", "Record FPS", "--record-fps", placeholder="50"),
             Field("record_duration_s", "Record seconds", "--record-duration-s", placeholder="10"),
             Field("record_output", "Output .npz", "--record-output", placeholder="data/recordings/live_human_joint_clip.npz"),
         ),
         toggles=(
             Toggle("free_root", "Free-root pelvis / walk (--free-root)", "--free-root"),
         ),
+    ),
+    DemoSpec(
+        key="resample-joint-clip",
+        title="Resample Clip (uniform fps)",
+        script=PROJECT_ROOT / "demos" / "demo_resample_joint_clip.py",
+        description="Post-process a recorded .npz onto a uniform frame rate (positions linear, root quaternion SLERP). Smooths uneven capture into evenly-spaced frames.",
+        notes="Enter the recorded clip path. Output defaults to <input>_<fps>fps.npz next to it.",
+        fields=(
+            Field("clip", "Clip .npz", "", placeholder="data/recordings/human_joint_clip.npz"),
+            Field("fps", "Target FPS", "--fps", placeholder="50"),
+            Field("output", "Output .npz", "--output", placeholder="(auto: <input>_50fps.npz)"),
+        ),
+        needs_args=True,
     ),
     DemoSpec(
         key="play-human-joint-clip",
@@ -413,6 +498,11 @@ class DemoLauncher(tk.Tk):
         ttk.Button(button_frame, text="Stop", command=self._stop_process, style="Danger.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(button_frame, text="Clear Output", command=self._clear_output, style="Secondary.TButton").pack(side="left", padx=(8, 0))
 
+        # Live controls: per-demo buttons that send stdin commands to the running
+        # process (e.g. Calibrate / Record / Stop for the manual recorder).
+        self.live_controls_frame = ttk.Frame(details, style="Panel.TFrame")
+        self.live_controls_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
+
         command_frame = ttk.Frame(controls, padding=(0, 12, 0, 0), style="Root.TFrame")
         command_frame.grid(row=1, column=0, sticky="ew")
         ttk.Label(command_frame, text="Command", style="Section.TLabel").pack(anchor="w", pady=(0, 6))
@@ -529,6 +619,34 @@ class DemoLauncher(tk.Tk):
                     command=self._refresh_command_label,
                 ).pack(side="left", padx=(0, 12))
 
+        # --- live control buttons (stdin commands to the running process) ---
+        for child in self.live_controls_frame.winfo_children():
+            child.destroy()
+        if not demo.command_buttons:
+            self.live_controls_frame.grid_remove()
+        else:
+            self.live_controls_frame.grid()
+            ttk.Label(self.live_controls_frame, text="Live controls", style="Section.TLabel").pack(anchor="w", pady=(0, 4))
+            row_f = ttk.Frame(self.live_controls_frame, style="Panel.TFrame")
+            row_f.pack(anchor="w")
+            for cb in demo.command_buttons:
+                ttk.Button(
+                    row_f, text=cb.label, style="Secondary.TButton",
+                    command=lambda c=cb.command: self._send_command(c),
+                ).pack(side="left", padx=(0, 8))
+
+    def _send_command(self, command: str) -> None:
+        """Write a command line to the running process's stdin."""
+        proc = self.process
+        if proc is None or proc.poll() is not None or proc.stdin is None:
+            messagebox.showinfo("Not running", "Start the demo first, then use the live controls.")
+            return
+        try:
+            proc.stdin.write(command + "\n")
+            proc.stdin.flush()
+        except (BrokenPipeError, OSError) as exc:
+            self._append_output(f"Could not send '{command}': {exc}\n", tag="error")
+
     def _add_placeholder(self, entry: ttk.Entry, key: str, var: tk.StringVar, text: str) -> None:
         """Show greyed placeholder text while the field is empty and unfocused."""
         def show() -> None:
@@ -613,6 +731,7 @@ class DemoLauncher(tk.Tk):
             self.process = subprocess.Popen(
                 command,
                 cwd=PROJECT_ROOT,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -656,6 +775,15 @@ class DemoLauncher(tk.Tk):
         if self.process is None or self.process.poll() is not None:
             self.status.set("Ready")
             return
+        # If the demo takes stdin commands, ask it to quit gracefully first so it
+        # can save any in-progress work; fall back to terminate/kill below.
+        demo = self._demo_by_key(self.selected_demo.get())
+        if demo.command_buttons and self.process.stdin is not None:
+            try:
+                self.process.stdin.write("quit\n")
+                self.process.stdin.flush()
+            except (BrokenPipeError, OSError):
+                pass
         self.process.terminate()
         self.status.set("Stopping...")
         self.after(1200, self._kill_if_still_running)

@@ -7,7 +7,9 @@ Usage (from project root):
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from pathlib import Path
+import queue
 import sys
 import threading
 import time
@@ -96,7 +98,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", choices=list(PARTIAL_CONFIGS), default="shanks")
     parser.add_argument("--duration-s", type=float, default=10.0)
     parser.add_argument("--fps", type=float, default=50.0)
-    parser.add_argument("--max-age-ms", type=float, default=150.0)
+    # 250 ms tolerates the occasional Wi-Fi stall (a sensor going quiet for a
+    # beat) without dropping the whole frame. Looser than the live viewer's
+    # 150 ms, trading a little cross-sensor sync slack for fewer dropped frames.
+    parser.add_argument("--max-age-ms", type=float, default=250.0)
     parser.add_argument("--min-samples", type=int, default=20)
     parser.add_argument("--calibration-delay-s", type=float, default=1.0)
     parser.add_argument(
@@ -104,6 +109,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Record a translating pelvis (foot-contact anchoring) instead of a "
         "pinned one. Best with the full IMU set.",
+    )
+    parser.add_argument(
+        "--manual",
+        action="store_true",
+        help="Manual control via stdin commands instead of auto calibrate+record. "
+        "Type (or have the launcher send): 'calibrate'/'c', 'record'/'r', "
+        "'stop'/'s', 'quit'/'q'. Recording runs until 'stop' or --duration-s.",
     )
     parser.add_argument(
         "--output",
@@ -263,15 +275,67 @@ def wait_for_segments(buffer: LatestPacketBuffer, required_segments: tuple[Segme
     print("All required segments are streaming.")
 
 
+def start_stdin_reader(commands: "queue.Queue[str]", stop_event: threading.Event) -> None:
+    """Background thread: push each stdin line (lowercased, stripped) onto a queue.
+
+    Works for a human typing in a terminal and for the launcher writing to the
+    subprocess's stdin. EOF (no stdin / pipe closed) just ends the thread.
+    """
+    def _reader() -> None:
+        try:
+            for line in sys.stdin:
+                if stop_event.is_set():
+                    break
+                cmd = line.strip().lower()
+                if cmd:
+                    commands.put(cmd)
+        except (EOFError, ValueError):
+            pass
+
+    threading.Thread(target=_reader, daemon=True).start()
+
+
+def capture_one_frame(
+    *,
+    buffer: LatestPacketBuffer,
+    filtered: dict,
+    filter_lock: threading.Lock,
+    profile: CalibrationProfile,
+    required_segments: tuple[SegmentId, ...],
+    max_age_s: float,
+    free_root: "FreeRootTracker | None",
+    dt: float,
+):
+    """Build one skeleton frame from the latest fresh orientations, or None."""
+    with filter_lock:
+        filtered_snapshot = dict(filtered)
+    segment_orientations = calibrated_segment_orientations(
+        filtered_snapshot, buffer, profile, required_segments, max_age_s
+    )
+    if segment_orientations is None:
+        return None
+    if free_root is not None:
+        pelvis_center = free_root.update(segment_orientations, dt=dt)
+        skeleton = aggregate_lower_body_skeleton(segment_orientations, pelvis_center=pelvis_center)
+    else:
+        skeleton = aggregate_lower_body_skeleton(segment_orientations)
+    return skeleton
+
+
 def main() -> None:
     args = parse_args()
     required_segments = PARTIAL_CONFIGS[args.config]
     max_age_s = args.max_age_ms / 1000.0
 
+    # Append a capture timestamp so successive recordings never overwrite each
+    # other, e.g. human_joint_clip_20260601_184312.npz.
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output = args.output.with_name(f"{args.output.stem}_{stamp}{args.output.suffix}")
+
     print("Human joint clip recorder")
     print(f"  config : {args.config}")
     print(f"  address: {args.host}:{args.port}")
-    print(f"  output : {args.output}")
+    print(f"  output : {output}")
     print(f"  points : {', '.join(JOINT_NAMES)}")
 
     buffer = LatestPacketBuffer()
@@ -293,99 +357,179 @@ def main() -> None:
     receiver_thread = threading.Thread(target=receive_loop, daemon=True)
     receiver_thread.start()
 
-    try:
-        wait_for_segments(buffer, required_segments)
-        print(f"Stand still in neutral pose. Calibration starts in {args.calibration_delay_s:.1f}s.")
-        time.sleep(max(0.0, args.calibration_delay_s))
-        profile = calibrate(buffer, required_segments, args.min_samples)
-
-        frame_period_s = 1.0 / args.fps
-        start_time = time.monotonic()
-        next_sample_time = start_time
-        target_frames = max(1, int(round(args.duration_s * args.fps)))
-
-        # Free-root: translating pelvis from foot-contact anchoring (default off).
-        free_root = FreeRootTracker() if args.free_root else None
-        last_frame_s = start_time
-
-        timestamps_s: list[float] = []
-        point_frames_w: list[np.ndarray] = []
-        point_frames_origin: list[np.ndarray] = []
-        root_pos_frames_w: list[np.ndarray] = []
-        root_quat_frames_wxyz: list[np.ndarray] = []
-        origin_w: np.ndarray | None = None
-        skipped = 0
-
-        print(f"Recording {target_frames} frames at {args.fps:g} FPS. Move now.")
-        while len(point_frames_w) < target_frames:
-            now = time.monotonic()
-            if now < next_sample_time:
-                time.sleep(min(0.005, next_sample_time - now))
-                continue
-            next_sample_time += frame_period_s
-
-            with filter_lock:
-                filtered_snapshot = dict(filtered)
-
-            segment_orientations = calibrated_segment_orientations(
-                filtered_snapshot,
-                buffer,
-                profile,
-                required_segments,
-                max_age_s,
-            )
-            if segment_orientations is None:
-                skipped += 1
-                continue
-
-            if free_root is not None:
-                pelvis_center = free_root.update(segment_orientations, dt=now - last_frame_s)
-                last_frame_s = now
-                skeleton = aggregate_lower_body_skeleton(
-                    segment_orientations, pelvis_center=pelvis_center
-                )
-            else:
-                skeleton = aggregate_lower_body_skeleton(segment_orientations)
-            points_w = ml_joint_positions_w(skeleton)
-            if origin_w is None:
-                origin_w = pelvis_ground_origin_w(points_w)
-            root_pos_w = skeleton.joints["pelvis"]
-            root_rotation = skeleton.segment_orientations[SegmentId.PELVIS]
-            root_quat_xyzw = root_rotation.as_quat()
-            root_quat_wxyz = np.array(
-                [root_quat_xyzw[3], root_quat_xyzw[0], root_quat_xyzw[1], root_quat_xyzw[2]],
-                dtype=float,
-            )
-
-            timestamps_s.append(now - start_time)
-            point_frames_w.append(points_w)
-            point_frames_origin.append(origin_relative_points(points_w, origin_w))
-            root_pos_frames_w.append(root_pos_w.copy())
-            root_quat_frames_wxyz.append(root_quat_wxyz)
-
-            if len(point_frames_w) % max(1, int(args.fps)) == 0:
-                print(f"  recorded {len(point_frames_w)}/{target_frames} frames")
-
-        if origin_w is None:
-            raise RuntimeError("recording finished without a valid frame")
-
-        point_array_w, point_array_origin = save_ml_joint_clip(
-            output=args.output,
-            point_frames_w=point_frames_w,
-            point_frames_origin=point_frames_origin,
-            root_pos_frames_w=root_pos_frames_w,
-            root_quat_frames_wxyz=root_quat_frames_wxyz,
-            timestamps_s=timestamps_s,
+    def save_session(session: dict, out: Path) -> None:
+        if not session["point_frames_w"] or session["origin_w"] is None:
+            print("Nothing recorded; nothing saved.")
+            return
+        pa_w, pa_origin = save_ml_joint_clip(
+            output=out,
+            point_frames_w=session["point_frames_w"],
+            point_frames_origin=session["point_frames_origin"],
+            root_pos_frames_w=session["root_pos_frames_w"],
+            root_quat_frames_wxyz=session["root_quat_frames_wxyz"],
+            timestamps_s=session["timestamps_s"],
             fps=args.fps,
             config=args.config,
             required_segments=required_segments,
-            pelvis_ground_origin=origin_w,
+            pelvis_ground_origin=session["origin_w"],
         )
-        print(f"Saved clip: {args.output}")
-        print(f"  joint_pos_origin: {point_array_origin.shape}")
-        print(f"  joint_pos_w     : {point_array_w.shape}")
-        print(f"  sample frame    : {frame_as_dict(point_array_origin[0])}")
-        print(f"  skipped stale frames: {skipped}")
+        print(f"Saved clip: {out}")
+        print(f"  joint_pos_w     : {pa_w.shape}")
+        print(f"  skipped stale frames: {session['skipped']}")
+
+    def new_session() -> dict:
+        return {
+            "timestamps_s": [], "point_frames_w": [], "point_frames_origin": [],
+            "root_pos_frames_w": [], "root_quat_frames_wxyz": [],
+            "origin_w": None, "skipped": 0, "free_root": FreeRootTracker() if args.free_root else None,
+            "start": None, "last_frame": None,
+        }
+
+    def append_frame(session: dict, skeleton, now: float) -> None:
+        if session["start"] is None:
+            session["start"] = now
+        points_w = ml_joint_positions_w(skeleton)
+        if session["origin_w"] is None:
+            session["origin_w"] = pelvis_ground_origin_w(points_w)
+        rq = skeleton.segment_orientations[SegmentId.PELVIS].as_quat()
+        session["timestamps_s"].append(now - session["start"])
+        session["point_frames_w"].append(points_w)
+        session["point_frames_origin"].append(origin_relative_points(points_w, session["origin_w"]))
+        session["root_pos_frames_w"].append(skeleton.joints["pelvis"].copy())
+        session["root_quat_frames_wxyz"].append(
+            np.array([rq[3], rq[0], rq[1], rq[2]], dtype=float)
+        )
+
+    try:
+        if not args.manual:
+            wait_for_segments(buffer, required_segments)
+            # --- automatic mode: delay, calibrate, record fixed duration -----
+            print(f"Stand still in neutral pose. Calibration starts in {args.calibration_delay_s:.1f}s.")
+            time.sleep(max(0.0, args.calibration_delay_s))
+            profile = calibrate(buffer, required_segments, args.min_samples)
+
+            frame_period_s = 1.0 / args.fps
+            next_sample_time = time.monotonic()
+            target_frames = max(1, int(round(args.duration_s * args.fps)))
+            session = new_session()
+            print(f"Recording {target_frames} frames at {args.fps:g} FPS. Move now.")
+            while len(session["point_frames_w"]) < target_frames:
+                now = time.monotonic()
+                if now < next_sample_time:
+                    time.sleep(min(0.005, next_sample_time - now))
+                    continue
+                next_sample_time += frame_period_s
+                dt = now - (session["last_frame"] or now)
+                session["last_frame"] = now
+                skeleton = capture_one_frame(
+                    buffer=buffer, filtered=filtered, filter_lock=filter_lock,
+                    profile=profile, required_segments=required_segments,
+                    max_age_s=max_age_s, free_root=session["free_root"], dt=dt,
+                )
+                if skeleton is None:
+                    session["skipped"] += 1
+                    continue
+                append_frame(session, skeleton, now)
+                if len(session["point_frames_w"]) % max(1, int(args.fps)) == 0:
+                    print(f"  recorded {len(session['point_frames_w'])}/{target_frames} frames")
+            save_session(session, output)
+            return
+
+        # --- manual mode: stdin commands drive calibrate/record/stop/quit ----
+        commands: "queue.Queue[str]" = queue.Queue()
+        start_stdin_reader(commands, stop_event)  # before the wait, so quit works
+        profile: CalibrationProfile | None = None
+        session: dict | None = None
+        recording = False
+        frame_period_s = 1.0 / args.fps
+        next_sample_time = time.monotonic()
+        clip_index = 0
+        print("\nManual mode. Commands: calibrate (c), record (r), stop (s), quit (q)")
+
+        # Interruptible wait for sensors: 'quit' breaks out even if packets
+        # never arrive, so the process never hangs unresponsively.
+        print("Waiting for required IMU segments...")
+        last_print = 0.0
+        while not all(s in buffer.packets for s in required_segments):
+            try:
+                if commands.get_nowait() in ("quit", "q"):
+                    print("Quit.")
+                    return
+            except queue.Empty:
+                pass
+            now = time.monotonic()
+            if now - last_print >= 1.0:
+                missing = [s.name.lower() for s in required_segments if s not in buffer.packets]
+                print(f"  missing: {', '.join(missing)}  (send 'quit' to exit)")
+                last_print = now
+            time.sleep(0.05)
+        print("All required segments are streaming. Send 'calibrate' first.\n")
+
+        while True:
+            # --- handle any pending commands ---
+            try:
+                while True:
+                    cmd = commands.get_nowait()
+                    if cmd in ("quit", "q"):
+                        if recording and session is not None:
+                            stamped = output.with_name(f"{output.stem}_{clip_index}{output.suffix}") if clip_index else output
+                            save_session(session, stamped)
+                        print("Quit.")
+                        return
+                    if cmd in ("calibrate", "c"):
+                        if recording:
+                            print("Stop recording before recalibrating.")
+                        else:
+                            print("Calibrating — stand still...")
+                            profile = calibrate(buffer, required_segments, args.min_samples)
+                            print("Calibrated. Send 'record' to start.")
+                    elif cmd in ("record", "r"):
+                        if profile is None:
+                            print("Calibrate first (send 'calibrate').")
+                        elif recording:
+                            print("Already recording.")
+                        else:
+                            session = new_session()
+                            recording = True
+                            next_sample_time = time.monotonic()
+                            print(f"Recording at {args.fps:g} FPS — send 'stop' to finish.")
+                    elif cmd in ("stop", "s"):
+                        if recording and session is not None:
+                            recording = False
+                            stamped = output.with_name(f"{output.stem}_{clip_index}{output.suffix}") if clip_index else output
+                            save_session(session, stamped)
+                            clip_index += 1
+                            session = None
+                        else:
+                            print("Not recording.")
+                    else:
+                        print(f"Unknown command: {cmd}")
+            except queue.Empty:
+                pass
+
+            # --- capture while recording ---
+            if recording and session is not None:
+                now = time.monotonic()
+                if now >= next_sample_time:
+                    next_sample_time += frame_period_s
+                    dt = now - (session["last_frame"] or now)
+                    session["last_frame"] = now
+                    skeleton = capture_one_frame(
+                        buffer=buffer, filtered=filtered, filter_lock=filter_lock,
+                        profile=profile, required_segments=required_segments,
+                        max_age_s=max_age_s, free_root=session["free_root"], dt=dt,
+                    )
+                    if skeleton is None:
+                        session["skipped"] += 1
+                    else:
+                        append_frame(session, skeleton, now)
+                        n = len(session["point_frames_w"])
+                        if n % max(1, int(args.fps)) == 0:
+                            print(f"  recorded {n} frames")
+                else:
+                    time.sleep(0.002)
+            else:
+                time.sleep(0.02)
     finally:
         stop_event.set()
 

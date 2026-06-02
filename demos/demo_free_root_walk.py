@@ -59,9 +59,12 @@ def walking_orientations(t_s: float, cadence_s: float) -> dict[SegmentId, Rotati
     right_s = np.sin(phase + np.pi)
 
     def leg(swing: float):
-        # Hip: swing forward (+) and back (-) about the medio-lateral axis (+Y).
-        hip_pitch = 25.0 * swing
-        # Knee bends most during swing (when the foot is off the ground).
+        # Hip pitch about the medio-lateral axis (+Y). In this body model a -y
+        # hip rotation carries the ankle toward +x (forward), so a forward swing
+        # uses negative pitch.
+        hip_pitch = -25.0 * swing
+        # Knee bends most during swing (when the foot is off the ground), which
+        # also lifts the foot so it reads as swing (high) not stance (low).
         knee_pitch = 35.0 * max(0.0, swing)
         # Ankle keeps the foot roughly flat.
         ankle_pitch = -0.5 * hip_pitch

@@ -315,6 +315,15 @@ bool connectWiFi() {
     updateWifiConnectingLed();
     const wl_status_t status = WiFi.status();
     if (status == WL_CONNECTED) {
+      // Disable Wi-Fi modem power-save. By default the ESP32 parks its radio
+      // between DTIM beacons and releases queued UDP in bursts, which shows up
+      // as steady ~100 Hz throughput punctuated by ~100-600 ms stalls. For a
+      // real-time IMU stream we want every packet out immediately, so we trade a
+      // little extra current (~20 mA) for steady low-latency delivery.
+      WiFi.setSleep(false);
+      // Max TX power for link margin: five nodes contend on one AP, and better
+      // margin means fewer retransmits/stalls.
+      WiFi.setTxPower(WIFI_POWER_19_5dBm);
       Serial.println("Wi-Fi connected.");
       Serial.print("ESP32 IP: ");
       Serial.println(WiFi.localIP());

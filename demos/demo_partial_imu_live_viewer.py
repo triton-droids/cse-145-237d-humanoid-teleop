@@ -650,6 +650,12 @@ def main() -> None:
     # its budget servicing the recorder.
     draw_period = 1.0 / args.draw_fps if args.draw_fps > 0 else float("inf")
     last_draw = 0.0
+    # Pump the GUI event loop at a modest rate so buttons stay responsive,
+    # decoupled from the heavy 3D redraw. flush_events() is cheap when there is
+    # nothing queued to draw, so ~30 Hz keeps the UI snappy without throttling
+    # capture the way calling it every iteration did.
+    pump_period = 1.0 / 30.0
+    last_pump = 0.0
     latest_skeleton = None  # most recent skeleton, reused by the throttled draw
     last_frame_s = time.monotonic()
 
@@ -792,8 +798,15 @@ def main() -> None:
             if not _interaction_paused():
                 fig.canvas.draw_idle()
 
-        fig.canvas.flush_events()
-        time.sleep(0.005)  # spin fast so capture is gated by packets, not draw
+        # Pump the GUI event loop on its own (faster) cadence, not every
+        # iteration: flush_events() on a 3D canvas can block for tens of ms, so
+        # calling it every spin throttled the whole capture loop down to the draw
+        # rate (this caused recordings landing at ~6 fps despite 100 Hz packets).
+        if (now - last_pump) >= pump_period:
+            last_pump = now
+            fig.canvas.flush_events()
+
+        time.sleep(0.002)  # spin fast so capture is gated by packets, not draw
 
     stop_event.set()
     if state["calib_abort"] is not None:
