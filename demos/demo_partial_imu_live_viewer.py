@@ -16,6 +16,7 @@ Usage (from project root):
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import threading
 import time
 from pathlib import Path
@@ -411,9 +412,16 @@ def main() -> None:
             _reset_recording_buffers()
             return
 
+        # Append a capture timestamp so successive recordings never overwrite
+        # each other, e.g. live_human_joint_clip_20260601_184312.npz.
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output = args.record_output.with_name(
+            f"{args.record_output.stem}_{stamp}{args.record_output.suffix}"
+        )
+
         try:
             point_array_w, point_array_origin = save_ml_joint_clip(
-                output=args.record_output,
+                output=output,
                 point_frames_w=frames,
                 point_frames_origin=state["record_point_frames_origin"],
                 root_pos_frames_w=state["record_root_pos_frames_w"],
@@ -431,10 +439,10 @@ def main() -> None:
             return
 
         state["record_message"] = (
-            f"saved {len(frames)} frames to {args.record_output} "
+            f"saved {len(frames)} frames to {output} "
             f"(skipped {state['record_skipped']})"
         )
-        print(f"\nSaved clip: {args.record_output}")
+        print(f"\nSaved clip: {output}")
         print(f"  joint_pos_origin: {point_array_origin.shape}")
         print(f"  joint_pos_w     : {point_array_w.shape}")
         print(f"  sample frame    : {frame_as_dict(point_array_origin[0])}")
@@ -559,6 +567,14 @@ def main() -> None:
     print("  Click Stop rec (or press Esc) to end recording early")
     print("  Click Clear calibration to return to the raw pose\n")
 
+    # Recording and rendering run on independent cadences. The loop spins fast
+    # so recording samples at its requested rate (limited only by how quickly
+    # fresh packets arrive), while the expensive 3D redraw is throttled to
+    # ~draw_fps and never holds back capture.
+    draw_period = 1.0 / 20.0
+    last_draw = 0.0
+    latest_skeleton = None  # most recent skeleton, reused by the throttled draw
+
     while plt.fignum_exists(fig.number):
         with filter_lock:
             filtered_snapshot = dict(filtered)
@@ -567,27 +583,14 @@ def main() -> None:
             filtered_snapshot, buffer, state["profile"], required_segments, max_age_s
         )
 
-        if seg_orients is not None:
+        now = time.monotonic()
+        fresh = seg_orients is not None
+        if fresh:
             skeleton = aggregate_lower_body_skeleton(seg_orients)
-            measured, estimated = lower_body_points_from_skeleton(skeleton)
+            latest_skeleton = skeleton
 
-            if "pelvis" in measured:
-                _set("pelvis", measured["pelvis"])
-
-            for key in _SEG_KEYS:
-                if key in measured:
-                    _set(key, measured[key])
-                    lines[f"{key}_est"].set_visible(False)
-                else:
-                    _set(f"{key}_est", estimated[key])
-                    lines[key].set_visible(False)
-
-            now = time.monotonic()
-            age_info = "  ".join(
-                f"{s.name.lower()}: {1000*(now - buffer.packets[s].receive_time_s):.0f}ms"
-                for s in required_segments
-            )
-            if state["recording"] and now >= state["record_next_sample_s"]:
+            # --- capture: runs every iteration, independent of the redraw ---
+            while state["recording"] and now >= state["record_next_sample_s"]:
                 state["record_next_sample_s"] += state["record_period_s"]
                 points_w = ml_joint_positions_w(skeleton)
                 if state["record_origin_w"] is None:
@@ -620,15 +623,11 @@ def main() -> None:
                 )
                 if frame_count >= target_frames:
                     _finish_recording()
-
-            if state["recording"]:
-                age_info = f"{age_info}\n{state['record_message']}"
-            elif state["record_message"] != "idle":
-                age_info = f"{age_info}\n{state['record_message']}"
-            status_text.set_text(age_info)
+                    break
         else:
-            now = time.monotonic()
-            if state["recording"] and now >= state["record_next_sample_s"]:
+            # No fresh frame: a recording sample slot still elapses, count it as
+            # skipped so the timeline and progress stay honest.
+            while state["recording"] and now >= state["record_next_sample_s"]:
                 state["record_next_sample_s"] += state["record_period_s"]
                 state["record_skipped"] += 1
                 state["record_message"] = (
@@ -636,31 +635,53 @@ def main() -> None:
                     f"{state['record_target_frames']} "
                     f"(skipped {state['record_skipped']})"
                 )
-            status_text.set_text("waiting for fresh packets…")
 
-        # Title reflects calibration state so feedback lives in the window.
-        if state["calibrating"]:
-            counts = state["calib_progress"].get("counts", {})
-            needed = state["calib_progress"].get("needed", args.min_samples)
-            done = sum(min(counts.get(s, 0), needed) for s in required_segments)
-            total = needed * len(required_segments)
-            ax.set_title(f"Calibrating — stand still… {done}/{total} samples")
-        elif state["profile"] is None:
-            ax.set_title(f"{live_title}  |  UNCALIBRATED — click Calibrate")
-        elif state["recording"]:
-            ax.set_title(f"{live_title}  |  calibrated  |  {state['record_message']}")
-        else:
-            ax.set_title(f"{live_title}  |  calibrated")
+        # --- render: throttled to draw_period, decoupled from capture --------
+        if (now - last_draw) >= draw_period:
+            last_draw = now
+            if fresh and latest_skeleton is not None:
+                measured, estimated = lower_body_points_from_skeleton(latest_skeleton)
+                if "pelvis" in measured:
+                    _set("pelvis", measured["pelvis"])
+                for key in _SEG_KEYS:
+                    if key in measured:
+                        _set(key, measured[key])
+                        lines[f"{key}_est"].set_visible(False)
+                    else:
+                        _set(f"{key}_est", estimated[key])
+                        lines[key].set_visible(False)
 
-        # Only push a redraw when the user is NOT interacting. While they rotate
-        # or move/resize the window we just keep the artist data current and let
-        # the backend own the canvas, which removes the flashing. flush_events
-        # pumps the GUI loop (keeps buttons/rotation responsive) without forcing
-        # the full-figure redraw that plt.pause() does.
-        if not _interaction_paused():
-            fig.canvas.draw_idle()
+                age_info = "  ".join(
+                    f"{s.name.lower()}: {1000*(now - buffer.packets[s].receive_time_s):.0f}ms"
+                    for s in required_segments
+                )
+                if state["recording"] or state["record_message"] != "idle":
+                    age_info = f"{age_info}\n{state['record_message']}"
+                status_text.set_text(age_info)
+            else:
+                status_text.set_text("waiting for fresh packets…")
+
+            # Title reflects calibration/recording state.
+            if state["calibrating"]:
+                counts = state["calib_progress"].get("counts", {})
+                needed = state["calib_progress"].get("needed", args.min_samples)
+                done = sum(min(counts.get(s, 0), needed) for s in required_segments)
+                total = needed * len(required_segments)
+                ax.set_title(f"Calibrating — stand still… {done}/{total} samples")
+            elif state["profile"] is None:
+                ax.set_title(f"{live_title}  |  UNCALIBRATED — click Calibrate")
+            elif state["recording"]:
+                ax.set_title(f"{live_title}  |  calibrated  |  {state['record_message']}")
+            else:
+                ax.set_title(f"{live_title}  |  calibrated")
+
+            # Skip the redraw entirely while the user rotates/moves the window so
+            # their interaction stays smooth (the backend owns the canvas then).
+            if not _interaction_paused():
+                fig.canvas.draw_idle()
+
         fig.canvas.flush_events()
-        time.sleep(0.02)  # ~50 Hz event loop; recording defaults to 30 FPS
+        time.sleep(0.005)  # spin fast so capture is gated by packets, not draw
 
     stop_event.set()
     if state["calib_abort"] is not None:
