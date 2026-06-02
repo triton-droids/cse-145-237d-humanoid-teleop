@@ -2,7 +2,7 @@
 
 This folder is for real wearable device input.
 
-Our near-term target:
+Near-term target:
 
 ```text
 BNO085 on each ESP32-S3
@@ -13,9 +13,9 @@ BNO085 on each ESP32-S3
     -> sensor/ normalization layer
 ```
 
-The BNO085 provides fused quaternion reports directly. We preserve the raw
-reported quaternion and metadata, then normalize ordering and frame meaning in
-`sensor/`.
+The BNO085 can provide fused quaternion reports directly. We should preserve
+the raw reported quaternion and metadata, then normalize ordering and frame
+meaning in `sensor/`.
 
 Responsibilities:
 
@@ -28,7 +28,7 @@ Responsibilities:
 
 ## Network Architecture
 
-We use direct ESP32-S3 to receiver UDP over the phone hotspot:
+Use direct ESP32-S3 to receiver UDP over the phone hotspot first:
 
 ```text
 ESP32-S3 pelvis      \
@@ -40,10 +40,9 @@ ESP32-S3 right shank  /
 ESP32-S3 right foot  /
 ```
 
-We don't use the pelvis ESP32-S3 as the hub in our current design. The phone hotspot
-only provides Wi-Fi connectivity; each ESP32 sends its own UDP packets to the
-receiver IP. Our packet contract supports the full seven-segment layout shown
-above; the current MVP can also run a smaller active subset.
+The pelvis ESP32-S3 is not the hub in the current design. The phone hotspot only
+provides Wi-Fi connectivity; each ESP32 sends its own UDP packets to the
+receiver IP.
 
 ## ESP32 Firmware
 

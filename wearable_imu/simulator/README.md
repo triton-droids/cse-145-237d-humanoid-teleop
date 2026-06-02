@@ -1,8 +1,8 @@
 # Simulator Workflow
 
-We've archived the MuJoCo simulator as a supporting harness.
+This folder is now an archived/supporting simulation harness.
 
-MuJoCo is still useful for:
+MuJoCo is useful for:
 
 - visualizing the current lower-body model
 - generating clean synthetic IMU quaternions
@@ -10,8 +10,8 @@ MuJoCo is still useful for:
 - injecting fake strap/mount errors later
 - regression testing estimator behavior
 
-It's no longer our main workflow. Real-world calibration and BNO085 quaternion
-handling live in `hardware/`, `sensor/`, and `calibration/`.
+It is not the main product workflow anymore. Real-world calibration and BNO085
+quaternion handling should live in `hardware/`, `sensor/`, and `calibration/`.
 
 Simulation should follow the same packet assumptions as hardware whenever data
 leaves the simulator:
@@ -28,5 +28,5 @@ accuracy/status placeholders
 Current viewer:
 
 ```powershell
-conda run -p ..\.conda python ..\demos\demo_mujoco_lower_body_viewer.py
+conda run --no-capture-output -n humanoid-sim python ..\demos\demo_mujoco_lower_body_viewer.py
 ```

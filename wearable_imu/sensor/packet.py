@@ -1,4 +1,4 @@
-"""Binary quaternion packet format shared by ESP32 firmware and Jetson code."""
+"""Binary quaternion packet format shared by ESP32 firmware and receiver code."""
 
 from __future__ import annotations
 

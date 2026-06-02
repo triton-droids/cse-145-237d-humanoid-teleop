@@ -51,7 +51,7 @@ void setup() {
   Serial.print("ESP32 TX data-out pin, to BNO085 SCL/UART-RX: GPIO ");
   Serial.println(BNO08X_TX_PIN);
 
-  Serial1.begin(BNO08X_UART_BAUD, SERIAL_8N1, BNO08X_RX_PIN, BNO08X_TX_PIN);
+  Serial1.begin(BNO08X_UART_BAUD, SERIAL_8N1, BNO0+8X_RX_PIN, BNO08X_TX_PIN);
   delay(100);
 
   if (!bno08x.begin_UART(&Serial1)) {

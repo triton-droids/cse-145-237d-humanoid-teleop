@@ -4,6 +4,12 @@ We originally developed the wearable IMU, inverse-kinematics, calibration, hardw
 
 https://github.com/triton-droids/cse-145-237d-humanoid-teleop/tree/inverse-kinematics
 
+Latest integrated source tip:
+
+```text
+origin/inverse-kinematics@66a6454a8e592c4ada3b839dbc1d7a56b8d2e750
+```
+
 In our course-project integration branch, we organized that branch's repository-root content under `wearable_imu/` so it can live beside the perception, retargeting, simulation, reports, and media folders.
 
 ## Layout Mapping

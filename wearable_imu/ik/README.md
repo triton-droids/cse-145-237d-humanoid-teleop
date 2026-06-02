@@ -1,6 +1,6 @@
 # IK Workflow
 
-This folder is where we estimate lower-body joint pose from calibrated segment
+This folder estimates lower-body joint pose from calibrated segment
 orientations.
 
 Current prototype:
@@ -13,7 +13,7 @@ Current prototype:
   into one pelvis/legs/feet skeleton with joint positions and relative joint
   rotations.
 
-Our real-world input comes from seven calibrated quaternion streams:
+The real-world input should be built from seven calibrated quaternion streams:
 
 ```text
 calibrated segment orientations
@@ -26,15 +26,16 @@ calibrated segment orientations
     right_foot
 ```
 
-We output joint estimates plus confidence/residual information. Our solver
-respects anatomical constraints instead of trusting every raw quaternion equally.
+The output should be joint estimates plus confidence/residual information. The
+solver should respect anatomical constraints instead of trusting every raw
+quaternion equally.
 
-Our IK layer doesn't parse UDP packets and doesn't know about ESP32 board
-IDs. It consumes calibrated segment orientations after `sensor/` and
+The IK layer should not parse UDP packets and should not know about ESP32 board
+IDs. It should consume calibrated segment orientations after `sensor/` and
 `calibration/` have already normalized the data.
 
 Aggregation demo:
 
 ```powershell
-conda run -p .\.conda python demos\demo_lower_body_aggregation.py
+conda run --no-capture-output -n humanoid-sim python demos\demo_lower_body_aggregation.py
 ```

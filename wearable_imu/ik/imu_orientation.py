@@ -35,23 +35,21 @@ Z_UP = np.array([0.0, 0.0, 1.0], dtype=float)
 
 @dataclass(frozen=True)
 class LowerLimbJointRotations:
-    """Relative joint rotations recovered from segment orientations."""
+    """Relative joint rotations recovered from segment orientations.
 
-    knee: Rotation
-    ankle: Rotation
+    ``knee`` and ``ankle`` are ``None`` when the corresponding distal IMU
+    (shank or foot) was absent; the joint is assumed neutral in that case.
+    """
+
     hip: Rotation | None = None
+    knee: Rotation | None = None
+    ankle: Rotation | None = None
 
     def euler_xyz_degrees(self) -> dict[str, tuple[float, float, float] | None]:
-        angles: dict[str, tuple[float, float, float] | None] = {
-            "knee": tuple(self.knee.as_euler("xyz", degrees=True)),
-            "ankle": tuple(self.ankle.as_euler("xyz", degrees=True)),
+        return {
+            name: tuple(rot.as_euler("xyz", degrees=True)) if rot is not None else None
+            for name, rot in (("hip", self.hip), ("knee", self.knee), ("ankle", self.ankle))
         }
-        angles["hip"] = (
-            tuple(self.hip.as_euler("xyz", degrees=True))
-            if self.hip is not None
-            else None
-        )
-        return angles
 
 
 @dataclass(frozen=True)
@@ -149,48 +147,53 @@ def solve_lower_limb_joints_from_imus(
 ) -> LowerLimbOrientationSolution:
     """Recover lower-limb joint rotations from segment-mounted IMUs.
 
-    Required IMUs: ``thigh``, ``shank``, and ``foot``.
-    Optional IMU: ``pelvis``. If present, a ``pelvis`` mount must also be
-    provided and the hip rotation is recovered as pelvis-to-thigh.
+    Required IMU: ``thigh``.
+    Optional IMUs: ``shank`` and ``foot`` (foot is silently ignored without shank).
+    When a distal IMU is absent its joint rotation is ``None`` and the segment
+    orientation is inherited from its proximal neighbour (neutral/straight assumption).
+    Optional IMU: ``pelvis``. If present, hip rotation is recovered as pelvis-to-thigh.
     """
 
     sensor_to_segment = dict(default_lower_limb_mounts(side))
     if mounts is not None:
         sensor_to_segment.update(mounts)
 
-    required = ("thigh", "shank", "foot")
-    missing = [
-        name
-        for name in required
-        if name not in imu_world_sensor or name not in sensor_to_segment
-    ]
-    if missing:
-        raise ValueError(f"missing required IMU or mount: {', '.join(missing)}")
+    if "thigh" not in imu_world_sensor or "thigh" not in sensor_to_segment:
+        raise ValueError("missing required IMU or mount: thigh")
 
-    segment_orientations = {
-        name: segment_orientation_from_imu(
-            imu_world_sensor[name],
-            sensor_to_segment[name],
-        )
-        for name in required
-    }
+    thigh_seg = segment_orientation_from_imu(
+        imu_world_sensor["thigh"], sensor_to_segment["thigh"]
+    )
+    segment_orientations: dict[str, Rotation] = {"thigh": thigh_seg}
 
     hip: Rotation | None = None
     if "pelvis" in imu_world_sensor:
         if "pelvis" not in sensor_to_segment:
             raise ValueError("pelvis IMU requires a pelvis mount calibration")
         pelvis = segment_orientation_from_imu(
-            imu_world_sensor["pelvis"],
-            sensor_to_segment["pelvis"],
+            imu_world_sensor["pelvis"], sensor_to_segment["pelvis"]
         )
         segment_orientations["pelvis"] = pelvis
-        hip = relative_rotation(pelvis, segment_orientations["thigh"])
+        hip = relative_rotation(pelvis, thigh_seg)
 
-    joints = LowerLimbJointRotations(
-        hip=hip,
-        knee=relative_rotation(segment_orientations["thigh"], segment_orientations["shank"]),
-        ankle=relative_rotation(segment_orientations["shank"], segment_orientations["foot"]),
-    )
+    knee: Rotation | None = None
+    shank_seg = thigh_seg
+    if "shank" in imu_world_sensor:
+        shank_seg = segment_orientation_from_imu(
+            imu_world_sensor["shank"], sensor_to_segment["shank"]
+        )
+        segment_orientations["shank"] = shank_seg
+        knee = relative_rotation(thigh_seg, shank_seg)
+
+    ankle: Rotation | None = None
+    if "foot" in imu_world_sensor and "shank" in imu_world_sensor:
+        foot_seg = segment_orientation_from_imu(
+            imu_world_sensor["foot"], sensor_to_segment["foot"]
+        )
+        segment_orientations["foot"] = foot_seg
+        ankle = relative_rotation(shank_seg, foot_seg)
+
+    joints = LowerLimbJointRotations(hip=hip, knee=knee, ankle=ankle)
     return LowerLimbOrientationSolution(
         segment_orientations=segment_orientations,
         joints=joints,

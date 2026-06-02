@@ -1,6 +1,6 @@
 # Sensor Workflow
 
-This folder defines our data contract between hardware/simulation and calibration.
+This folder owns the data contract between hardware/simulation and calibration.
 
 Expected input:
 
@@ -27,12 +27,12 @@ Responsibilities:
 - reject obvious quaternion spikes before calibration
 - smooth accepted orientations with quaternion SLERP
 
-This layer doesn't estimate joints. Its job is to make sensor data boring and
+This layer should not estimate joints. It should make sensor data boring and
 consistent before calibration sees it.
 
 ## Current Binary UDP Contract
 
-Our first ESP32 firmware sends one 40-byte little-endian packet per quaternion:
+The first ESP32 firmware sends one 40-byte little-endian packet per quaternion:
 
 ```text
 magic[4]          "IMUQ"
@@ -58,10 +58,10 @@ Current identity assumptions:
 - valid lower-body segment IDs are `0..6`.
 - `255` means unknown/unassigned.
 
-Run the first Jetson-side receiver demo:
+Run the first receiver demo on the laptop connected to the same phone hotspot:
 
 ```powershell
-conda run -p .\.conda python demos\demo_udp_quaternion_receiver.py
+conda run --no-capture-output -n humanoid-sim python demos\demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
 ```
 
 ## Current Filtering

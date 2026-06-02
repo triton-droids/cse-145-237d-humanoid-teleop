@@ -1,6 +1,6 @@
 # Evaluation Workflow
 
-This folder is where we measure estimator behavior.
+This folder is for measuring estimator behavior.
 
 Possible checks:
 
@@ -11,5 +11,5 @@ Possible checks:
 - test magnetometer disturbance sensitivity
 - compare real captures against video or manually labeled events
 
-We report errors and confidence clearly enough that we can tell whether a
-calibration or IK change actually helped.
+Evaluation should report errors and confidence clearly enough that we know
+whether a calibration or IK change actually helped.
