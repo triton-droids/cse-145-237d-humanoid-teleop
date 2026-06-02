@@ -31,6 +31,7 @@ from holosoma_retargeting.config_types.robot import RobotConfig  # noqa: E402
 from holosoma_retargeting.examples.robot_retarget import (  # type: ignore[import-not-found]  # noqa: E402
     DEFAULT_DATA_FORMATS,
     build_retargeter_kwargs_from_config,
+    build_contact_confidence_sequence,
     create_task_constants,
     initialize_robot_pose,
     load_motion_data,
@@ -246,6 +247,14 @@ def process_single_task(args):
             for fs in foot_sticking_sequences:
                 fs["L_Toe"], fs["R_Toe"] = fs["R_Toe"], fs["L_Toe"]
 
+        stance_contact_confidences = None
+        if retargeter.stance.enable:
+            stance_contact_confidences = build_contact_confidence_sequence(foot_sticking_sequences, retargeter.stance)
+            foot_sticking_sequences = [
+                {key: confidence >= 0.5 for key, confidence in frame.items()}
+                for frame in stance_contact_confidences
+            ]
+
         # Task-specific foot sticking adjustments
         if task_type == "object_interaction":
             # Disable initial sticking
@@ -298,6 +307,7 @@ def process_single_task(args):
             object_points_local_demo=object_local_pts_demo,
             object_points_local=object_local_pts,
             foot_sticking_sequences=foot_sticking_sequences,
+            stance_contact_confidences=stance_contact_confidences,
             q_a_init=q_init,
             q_nominal_list=q_nominal,
             original=(k == 0),
