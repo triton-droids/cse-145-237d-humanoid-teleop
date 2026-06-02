@@ -15,8 +15,12 @@ from ik.ch_robot_retarget import (
     HUMAN_JOINT_NAMES,
     JOINT_LIMIT_HIGH,
     JOINT_LIMIT_LOW,
+    LEFT_ANKLE_IDX,
+    LEFT_TOE_IDX,
     QPOS_WIDTH,
     QVEL_WIDTH,
+    RIGHT_ANKLE_IDX,
+    RIGHT_TOE_IDX,
     QvelFiniteDifferencer,
     HumanJointClip,
     base_position_from_joint_points,
@@ -171,6 +175,19 @@ def test_neutral_joint_positions_reconstruct_zero_qpos() -> None:
     np.testing.assert_allclose(qpos, legposes_to_qpos(_identity_joint_rotations()))
 
 
+def test_backward_generated_toe_points_do_not_flip_foot_frame() -> None:
+    points = _neutral_joint_positions()
+    points[LEFT_TOE_IDX] = points[LEFT_ANKLE_IDX] + np.array([-0.18, 0.0, 0.0])
+    points[RIGHT_TOE_IDX] = points[RIGHT_ANKLE_IDX] + np.array([-0.18, 0.0, 0.0])
+
+    legposes = joint_positions_to_legposes(points, Rotation.identity())
+    qpos = joint_positions_to_qpos(points, Rotation.identity())
+
+    for legpose in legposes.values():
+        np.testing.assert_allclose(legpose.ankle.as_rotvec(), [0.0, 0.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(qpos, legposes_to_qpos(_identity_joint_rotations()))
+
+
 def test_human_joint_clip_to_qpos_qvel_converts_recorded_imu_handoff_shape() -> None:
     points = np.stack([_neutral_joint_positions(), _neutral_joint_positions()])
     points[1, 2, 0] = 0.03
@@ -206,16 +223,16 @@ def test_root_xy_base_motion_drives_freejoint_translation_and_velocity() -> None
     qpos, qvel = human_joint_clip_to_qpos_qvel(clip, base_motion="root_xy")
 
     np.testing.assert_allclose(qpos[0, :3], [0.0, 0.0, BASE_HEIGHT_M])
-    np.testing.assert_allclose(qpos[1, :3], [-0.04, -0.12, BASE_HEIGHT_M])
+    np.testing.assert_allclose(qpos[1, :3], [-0.04, 0.12, BASE_HEIGHT_M])
     np.testing.assert_allclose(qvel[0, :3], [0.0, 0.0, 0.0])
-    np.testing.assert_allclose(qvel[1, :3], [-2.0, -6.0, 0.0])
+    np.testing.assert_allclose(qvel[1, :3], [-2.0, 6.0, 0.0])
     np.testing.assert_allclose(
         base_position_from_joint_points(
             points[1],
             root_origin=points[0, 0],
             base_motion="root_xyz",
         ),
-        [-0.04, -0.12, BASE_HEIGHT_M + 0.03],
+        [-0.04, 0.12, BASE_HEIGHT_M + 0.03],
     )
 
 
@@ -233,15 +250,15 @@ def test_root_xy_forward_base_motion_keeps_forward_displacement_positive() -> No
 
     qpos, qvel = human_joint_clip_to_qpos_qvel(clip, base_motion="root_xy_forward")
 
-    np.testing.assert_allclose(qpos[1, :3], [-0.04, -0.12, BASE_HEIGHT_M])
-    np.testing.assert_allclose(qvel[1, :3], [-2.0, -6.0, 0.0])
+    np.testing.assert_allclose(qpos[1, :3], [-0.04, 0.12, BASE_HEIGHT_M])
+    np.testing.assert_allclose(qvel[1, :3], [-2.0, 6.0, 0.0])
     np.testing.assert_allclose(
         base_position_from_joint_points(
             points[1],
             root_origin=points[0, 0],
             base_motion="root_xy_forward",
         ),
-        [-0.04, -0.12, BASE_HEIGHT_M],
+        [-0.04, 0.12, BASE_HEIGHT_M],
     )
 
 
@@ -402,13 +419,13 @@ def test_holosoma_branch_mjcf_contract_matches_live_retargeter() -> None:
 
 
 def test_to_robot_frame_uses_expected_basis_change() -> None:
-    np.testing.assert_allclose(HUMAN_TO_ROBOT_FRAME.apply([0.0, 1.0, 0.0]), [1.0, 0.0, 0.0])
-    np.testing.assert_allclose(HUMAN_TO_ROBOT_FRAME.apply([1.0, 0.0, 0.0]), [0.0, -1.0, 0.0])
+    np.testing.assert_allclose(HUMAN_TO_ROBOT_FRAME @ [0.0, 1.0, 0.0], [1.0, 0.0, 0.0])
+    np.testing.assert_allclose(HUMAN_TO_ROBOT_FRAME @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
 
     human_forward_yaw = Rotation.from_euler("z", np.pi / 2.0)
     robot_rot = to_robot_frame(human_forward_yaw)
 
-    np.testing.assert_allclose(robot_rot.as_rotvec(), [0.0, 0.0, np.pi / 2.0], atol=1e-12)
+    np.testing.assert_allclose(robot_rot.as_rotvec(), [0.0, 0.0, -np.pi / 2.0], atol=1e-12)
 
 
 def strip_robot_yaw_reference(rot: Rotation) -> Rotation:
@@ -424,7 +441,7 @@ def _identity_joint_rotations() -> dict[str, LegPose]:
 
 
 def _from_robot_frame(rot: Rotation) -> Rotation:
-    return HUMAN_TO_ROBOT_FRAME.inv() * rot * HUMAN_TO_ROBOT_FRAME
+    return Rotation.from_matrix(HUMAN_TO_ROBOT_FRAME.T @ rot.as_matrix() @ HUMAN_TO_ROBOT_FRAME)
 
 
 def _rotation_from_wxyz(quat_wxyz: np.ndarray) -> Rotation:

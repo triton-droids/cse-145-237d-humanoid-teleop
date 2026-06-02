@@ -111,11 +111,13 @@ Frame convention:
 
 ```text
 Human frame         : +X forward, +Y left, +Z up
-ch_robot/MuJoCo    : -Y forward, +X left, +Z up
+ch_robot/MuJoCo    : +Y forward, +X left, +Z up
 ```
 
 The code already converts root translation from the human frame into the
-ch_robot/MuJoCo frame.
+ch_robot/MuJoCo frame. For position-only replay, generated toe points that
+point behind the pelvis forward axis are flipped back to anatomical forward so
+shank-only IMU clips do not display feet facing backward.
 
 ## 5. Offline MuJoCo Visualization: Camera JSONL
 

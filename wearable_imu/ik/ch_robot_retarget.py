@@ -8,7 +8,7 @@ MuJoCo qpos layout used by the ch_robot Holosoma contract:
 It is intentionally a direct geometric projection, not an optimizer.  The
 coordinate mapping below follows the current IMU pipeline convention
 (``+X`` forward, ``+Y`` left, ``+Z`` up) and the ch_robot convention inferred
-from the MJCF (``-Y`` forward, ``+X`` left/lateral, ``+Z`` up).  If the ch_robot
+from the MJCF (``+Y`` forward, ``+X`` left/lateral, ``+Z`` up).  If the ch_robot
 MJCF is available, validate signs in the viewer with single-axis poses before
 using this for hardware control.
 """
@@ -116,17 +116,15 @@ JOINT_LIMIT_HIGH = 1.57
 X_AXIS = np.array([1.0, 0.0, 0.0], dtype=np.float64)
 
 # Human: +X forward, +Y left, +Z up.
-# ch_robot: -Y forward, +X left/lateral, +Z up.
-# Mapping: human +X -> robot -Y, human +Y -> robot +X, human +Z -> robot +Z.
-HUMAN_TO_ROBOT_FRAME = Rotation.from_matrix(
-    np.array(
-        [
-            [0.0, 1.0, 0.0],
-            [-1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0],
-        ],
-        dtype=np.float64,
-    )
+# ch_robot: +Y forward, +X left/lateral, +Z up.
+# Mapping: human +X -> robot +Y, human +Y -> robot +X, human +Z -> robot +Z.
+HUMAN_TO_ROBOT_FRAME = np.array(
+    [
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ],
+    dtype=np.float64,
 )
 
 # Kept explicit so right-leg mirror corrections can be applied in one place
@@ -228,6 +226,7 @@ def joint_positions_to_legposes(
 
     pelvis_rot = pelvis_orientation or _pelvis_frame_from_points(points)
     lateral_axis = _unit(points[LEFT_HIP_IDX] - points[RIGHT_HIP_IDX])
+    forward_axis = pelvis_rot.apply([1.0, 0.0, 0.0])
 
     left_thigh = _limb_segment_frame(
         proximal=points[LEFT_HIP_IDX],
@@ -243,6 +242,7 @@ def joint_positions_to_legposes(
         ankle=points[LEFT_ANKLE_IDX],
         toe=points[LEFT_TOE_IDX],
         lateral_axis=lateral_axis,
+        forward_axis=forward_axis,
     )
 
     right_thigh = _limb_segment_frame(
@@ -259,6 +259,7 @@ def joint_positions_to_legposes(
         ankle=points[RIGHT_ANKLE_IDX],
         toe=points[RIGHT_TOE_IDX],
         lateral_axis=lateral_axis,
+        forward_axis=forward_axis,
     )
 
     return {
@@ -473,12 +474,12 @@ def base_position_from_joint_points(
         raise ValueError(f"root_origin must have shape (3,), got {origin.shape}")
 
     root_delta_human = points[SPINE1_IDX] - origin
-    root_delta = HUMAN_TO_ROBOT_FRAME.apply(root_delta_human)
+    root_delta = HUMAN_TO_ROBOT_FRAME @ root_delta_human
     if base_motion == "root_xy":
         return np.array([root_delta[0], root_delta[1], base_height], dtype=np.float64)
     if base_motion == "root_xy_forward":
         return np.array(
-            [root_delta_human[1], -abs(root_delta_human[0]), base_height],
+            [root_delta_human[1], abs(root_delta_human[0]), base_height],
             dtype=np.float64,
         )
     if base_motion == "root_xyz":
@@ -560,7 +561,7 @@ def twist_about_axis(rot: Rotation, axis: Vector3) -> float:
 def to_robot_frame(rot: Rotation) -> Rotation:
     """Express a human-pipeline rotation in the ch_robot body frame."""
 
-    return HUMAN_TO_ROBOT_FRAME * rot * HUMAN_TO_ROBOT_FRAME.inv()
+    return Rotation.from_matrix(HUMAN_TO_ROBOT_FRAME @ rot.as_matrix() @ HUMAN_TO_ROBOT_FRAME.T)
 
 
 def strip_robot_yaw(rot: Rotation) -> Rotation:
@@ -637,8 +638,15 @@ def _limb_segment_frame(proximal: np.ndarray, distal: np.ndarray, lateral_axis: 
     return Rotation.from_matrix(np.column_stack([x_axis, y_axis, z_axis]))
 
 
-def _foot_segment_frame(ankle: np.ndarray, toe: np.ndarray, lateral_axis: np.ndarray) -> Rotation:
+def _foot_segment_frame(
+    ankle: np.ndarray,
+    toe: np.ndarray,
+    lateral_axis: np.ndarray,
+    forward_axis: np.ndarray,
+) -> Rotation:
     x_axis = _unit(np.asarray(toe, dtype=np.float64) - np.asarray(ankle, dtype=np.float64))
+    if float(np.dot(x_axis, _unit(forward_axis))) < 0.0:
+        x_axis = -x_axis
     y_axis = _orthogonal_component(lateral_axis, x_axis)
     if np.linalg.norm(y_axis) < 1e-8:
         y_axis = np.array([0.0, 1.0, 0.0], dtype=np.float64)
