@@ -117,6 +117,17 @@ DEMOS: tuple[DemoSpec, ...] = (
         ),
     ),
     DemoSpec(
+        key="play-human-joint-clip",
+        title="Play Human Joint Clip",
+        script=PROJECT_ROOT / "demos" / "demo_play_human_joint_clip.py",
+        description="Play back a recorded .npz joint clip as an animated 3D skeleton.",
+        notes=(
+            "Enter the clip path in Extra args, e.g. data/recordings/live_human_joint_clip.npz. "
+            "Add --origin to view pelvis-relative joints, or --speed 2 to play faster."
+        ),
+        needs_args=True,
+    ),
+    DemoSpec(
         key="udp-quaternion-receiver",
         title="UDP Quaternion Receiver",
         script=PROJECT_ROOT / "demos" / "demo_udp_quaternion_receiver.py",

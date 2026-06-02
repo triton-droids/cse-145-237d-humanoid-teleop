@@ -37,6 +37,7 @@ development.
 |---|---|---|
 | `demo_live_lower_body_aggregation.py` | Animated synthetic walking skeleton (Matplotlib 3D). | `--frames N`, `--no-show` (headless, saves a PNG), `--interval-ms` |
 | `demo_lower_body_aggregation.py` | Aggregates one static seven-segment pose and prints joint positions + rotations. | — |
+| `demo_play_human_joint_clip.py` | Plays back a recorded `.npz` joint clip as an animated 3D skeleton (Play/Pause + scrub slider). | positional `clip`, `--origin`, `--speed`, `--no-show` |
 | `demo_imu_orientation_ik.py` | Recovers hip/knee/ankle rotations from synthetic mounted-IMU orientations. | — |
 | `demo_inverse_kinematics.py` | Toy planar-leg IK solver. | `--plot`, `--x`, `--z`, `--angle`, `--knee-direction` |
 | `demo_visualize_lower_body_model.py` | Renders the body model + IMU mount frames to a PNG. | `--output PATH` |
