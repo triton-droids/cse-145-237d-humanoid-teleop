@@ -431,6 +431,16 @@ Open the GUI launcher:
 python demos/demo_launcher.py
 ```
 
+The launcher pre-fills the common local defaults, so for the retargeting demos
+you can usually select a row and press `Run Demo` directly. The default dataset
+paths are:
+
+```text
+Camera JSONL : ../data/smplh_capture_3.jsonl
+Human NPZ    : ../data/human_joint_clip_20260601_231345.npz
+ZMQ endpoint : tcp://127.0.0.1:5556
+```
+
 Common launcher entries:
 
 ```text

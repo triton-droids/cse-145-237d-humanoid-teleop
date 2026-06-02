@@ -22,6 +22,11 @@ from tkinter import messagebox, ttk
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ANSI_CLEAR_HOME = "\033[2J\033[H"
+DEFAULT_CAMERA_CLIP = "../data/smplh_capture_3.jsonl"
+DEFAULT_HUMAN_CLIP = "../data/human_joint_clip_20260601_231345.npz"
+DEFAULT_ZMQ_ENDPOINT = "tcp://127.0.0.1:5556"
+DEFAULT_UDP_HOST = "0.0.0.0"
+DEFAULT_IMU_PORT = "5005"
 
 
 def _pick_font(root: tk.Misc, candidates: tuple[str, ...], fallback: str) -> str:
@@ -182,12 +187,12 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("host", "Host", "--host", placeholder="0.0.0.0"),
-            Field("port", "Port", "--port", placeholder="5005"),
-            Field("record_fps", "Record FPS", "--record-fps", placeholder="50"),
-            Field("draw_fps", "Draw FPS", "--draw-fps", placeholder="10"),
-            Field("record_duration_s", "Record seconds", "--record-duration-s", placeholder="10"),
-            Field("record_output", "Output .npz", "--record-output", placeholder="data/recordings/live_human_joint_clip.npz"),
+            Field("host", "Host", "--host", default=DEFAULT_UDP_HOST, placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", default=DEFAULT_IMU_PORT, placeholder="5005"),
+            Field("record_fps", "Record FPS", "--record-fps", default="50", placeholder="50"),
+            Field("draw_fps", "Draw FPS", "--draw-fps", default="10", placeholder="10"),
+            Field("record_duration_s", "Record seconds", "--record-duration-s", default="10", placeholder="10"),
+            Field("record_output", "Output .npz", "--record-output", default="data/recordings/live_human_joint_clip.npz", placeholder="data/recordings/live_human_joint_clip.npz"),
         ),
     ),
     DemoSpec(
@@ -220,11 +225,11 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("host", "Host", "--host", placeholder="0.0.0.0"),
-            Field("port", "Port", "--port", placeholder="5005"),
-            Field("fps", "Output FPS", "--fps", placeholder="100"),
-            Field("target_host", "Target host", "--target-host", placeholder="127.0.0.1"),
-            Field("target_port", "Target port", "--target-port", placeholder="6010"),
+            Field("host", "Host", "--host", default=DEFAULT_UDP_HOST, placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", default=DEFAULT_IMU_PORT, placeholder="5005"),
+            Field("fps", "Output FPS", "--fps", default="100", placeholder="100"),
+            Field("target_host", "Target host", "--target-host", default="127.0.0.1", placeholder="127.0.0.1"),
+            Field("target_port", "Target port", "--target-port", default="6010", placeholder="6010"),
         ),
         toggles=(
             Toggle("no_calibration", "Skip calibration", "--no-calibration"),
@@ -260,9 +265,9 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip path", "", placeholder="../data/smplh_capture_3.jsonl"),
+            Field("clip", "Clip path", "", default=DEFAULT_CAMERA_CLIP, placeholder="../data/smplh_capture_3.jsonl"),
             Field("save_output", "Save .npz", "--save-output", placeholder="../data/ch_robot_replay_qpos.npz"),
-            Field("speed", "Speed", "--speed", placeholder="1.0"),
+            Field("speed", "Speed", "--speed", default="1.0", placeholder="1.0"),
         ),
         toggles=(
             Toggle("no_show", "No window", "--no-show"),
@@ -299,8 +304,8 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("input", "Input path", "", placeholder="../data/smplh_capture_3.jsonl"),
-            Field("speed", "Speed", "--speed", placeholder="1.0"),
+            Field("input", "Input path", "", default=DEFAULT_CAMERA_CLIP, placeholder="../data/smplh_capture_3.jsonl"),
+            Field("speed", "Speed", "--speed", default="1.0", placeholder="1.0"),
         ),
         toggles=(
             Toggle("no_show", "No window", "--no-show"),
@@ -338,8 +343,8 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip .npz", "", placeholder="../data/human_joint_clip_20260601_231345.npz"),
-            Field("speed", "Speed", "--speed", placeholder="1.0"),
+            Field("clip", "Clip .npz", "", default=DEFAULT_HUMAN_CLIP, placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("speed", "Speed", "--speed", default="1.0", placeholder="1.0"),
         ),
         toggles=(
             Toggle("human_origin", "Human pelvis-relative", "--human-origin"),
@@ -365,10 +370,10 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip path", "", placeholder="../data/smplh_capture_3.jsonl"),
-            Field("endpoint", "Endpoint", "--endpoint", placeholder="tcp://127.0.0.1:5556"),
-            Field("fps", "Publish FPS", "--fps", placeholder="50"),
-            Field("max_frames", "Max frames", "--max-frames", placeholder="0"),
+            Field("clip", "Clip path", "", default=DEFAULT_CAMERA_CLIP, placeholder="../data/smplh_capture_3.jsonl"),
+            Field("endpoint", "Endpoint", "--endpoint", default=DEFAULT_ZMQ_ENDPOINT, placeholder="tcp://127.0.0.1:5556"),
+            Field("fps", "Publish FPS", "--fps", default="50", placeholder="50"),
+            Field("max_frames", "Max frames", "--max-frames", default="0", placeholder="0"),
         ),
         toggles=(
             Toggle("no_loop", "No loop", "--no-loop"),
@@ -398,8 +403,8 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("endpoint", "Endpoint", "--endpoint", placeholder="tcp://127.0.0.1:5556"),
-            Field("max_frames", "Max frames", "--max-frames", placeholder="0"),
+            Field("endpoint", "Endpoint", "--endpoint", default=DEFAULT_ZMQ_ENDPOINT, placeholder="tcp://127.0.0.1:5556"),
+            Field("max_frames", "Max frames", "--max-frames", default="0", placeholder="0"),
         ),
         toggles=(
             Toggle("no_show", "No window", "--no-show"),
@@ -413,8 +418,8 @@ DEMOS: tuple[DemoSpec, ...] = (
         description="Play back a recorded .npz joint clip as an animated 3D skeleton.",
         notes="Enter the clip path below. Origin shows pelvis-relative joints; Speed multiplies playback rate.",
         fields=(
-            Field("clip", "Clip .npz", "", placeholder="data/recordings/live_human_joint_clip.npz"),
-            Field("speed", "Speed", "--speed", placeholder="1.0"),
+            Field("clip", "Clip .npz", "", default=DEFAULT_HUMAN_CLIP, placeholder="data/recordings/live_human_joint_clip.npz"),
+            Field("speed", "Speed", "--speed", default="1.0", placeholder="1.0"),
         ),
         toggles=(
             Toggle("origin", "Pelvis-relative (--origin)", "--origin"),
@@ -428,8 +433,8 @@ DEMOS: tuple[DemoSpec, ...] = (
         description="Monitor live ESP32/BNO085 quaternion packet status over UDP.",
         notes="Requires ESP32/BNO085 nodes streaming UDP packets.",
         fields=(
-            Field("host", "Host", "--host", placeholder="0.0.0.0"),
-            Field("port", "Port", "--port", placeholder="5005"),
+            Field("host", "Host", "--host", default=DEFAULT_UDP_HOST, placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", default=DEFAULT_IMU_PORT, placeholder="5005"),
         ),
     ),
     DemoSpec(
@@ -439,8 +444,8 @@ DEMOS: tuple[DemoSpec, ...] = (
         description="Measure UDP round-trip latency to one ESP32 node.",
         notes="Enter the ESP32 IP address (from Serial Monitor) below.",
         fields=(
-            Field("esp32_ip", "ESP32 IP", "", placeholder="192.168.4.20"),
-            Field("port", "Port", "--port", placeholder="5006"),
+            Field("esp32_ip", "ESP32 IP", "", default="192.168.4.20", placeholder="192.168.4.20"),
+            Field("port", "Port", "--port", default="5006", placeholder="5006"),
         ),
         needs_args=True,
     ),
