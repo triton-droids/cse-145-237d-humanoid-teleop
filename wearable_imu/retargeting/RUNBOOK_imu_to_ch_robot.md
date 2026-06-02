@@ -182,7 +182,46 @@ Disable looping:
 python demos/demo_mujoco_ch_robot_replay.py ../data/human_joint_clip_20260601_231345.npz --base-motion root_xy --no-loop
 ```
 
-## 7. Matplotlib Retargeting Debug View
+## 7. Play a Human Joint Clip
+
+Use this first when you want to inspect the recorded human 9-joint clip before
+retargeting it to ch_robot. This script only accepts recorded `.npz` human
+joint clips, not camera `.jsonl` captures.
+
+Print a summary without opening a window:
+
+```bash
+python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --no-show
+```
+
+Open the 3D human skeleton player:
+
+```bash
+python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz
+```
+
+Show pelvis-origin-relative joint positions instead of world positions:
+
+```bash
+python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --origin
+```
+
+Change playback speed:
+
+```bash
+python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --speed 0.5
+python demos/demo_play_human_joint_clip.py ../data/human_joint_clip_20260601_231345.npz --speed 2.0
+```
+
+Useful interpretation:
+
+```text
+demo_play_human_joint_clip.py      : inspect the raw recorded human joint positions
+demo_replay_ch_robot_retarget.py   : inspect human skeleton plus retargeted ch_robot joint angles
+demo_mujoco_ch_robot_replay.py     : inspect the retargeted motion on the ch_robot MuJoCo model
+```
+
+## 8. Matplotlib Retargeting Debug View
 
 This path does not open MuJoCo. It visualizes the human skeleton and shows the
 resulting ch_robot joint angles.
@@ -220,7 +259,7 @@ Replay the saved `qpos`/`qvel` in MuJoCo:
 python demos/demo_mujoco_ch_robot_replay.py ../data/ch_robot_replay_qpos_smplh_capture_3.npz
 ```
 
-## 8. 50 Hz ZMQ Mock-Live: Camera JSONL
+## 9. 50 Hz ZMQ Mock-Live: Camera JSONL
 
 This is the closest recorded-data path to live operation. The publisher sends
 each 9-joint position frame at 50 Hz. The subscriber retargets every incoming
@@ -278,7 +317,7 @@ received=10 frame=9
 Converted 10 ZMQ frames.
 ```
 
-## 9. 50 Hz ZMQ Mock-Live: Recorded IMU NPZ
+## 10. 50 Hz ZMQ Mock-Live: Recorded IMU NPZ
 
 Terminal 1:
 
@@ -295,7 +334,7 @@ python demos/demo_zmq_human_joint_publisher.py \
   --fps 50
 ```
 
-## 10. Real IMU Live Retargeting
+## 11. Real IMU Live Retargeting
 
 The real ESP32/BNO085 IMU live path is currently orientation-only. It can emit
 live joint rotations retargeted into ch_robot `qpos`/`qvel`, but it does not
@@ -341,7 +380,7 @@ root_position_source -> base_position_from_joint_points(...) or equivalent
 -> legposes_to_qpos(..., base_position=...)
 ```
 
-## 11. Demo Launcher
+## 12. Demo Launcher
 
 Open the GUI launcher:
 
@@ -357,6 +396,7 @@ MuJoCo ch_robot Replay    : offline MuJoCo replay
 ZMQ Human Joint Publisher : mock-live publisher
 MuJoCo ch_robot ZMQ       : mock-live subscriber + MuJoCo viewer
 Live ch_robot Retarget    : real ESP32 IMU orientation-only bridge
+Play Human Joint Clip     : raw recorded human .npz skeleton player
 ```
 
 For replay, MuJoCo replay, and ZMQ subscriber entries, the launcher exposes a
@@ -366,7 +406,7 @@ For replay, MuJoCo replay, and ZMQ subscriber entries, the launcher exposes a
 root_xy, fixed, root_xyz
 ```
 
-## 12. Model Cache and Floor
+## 13. Model Cache and Floor
 
 `demo_mujoco_ch_robot_replay.py` and `demo_mujoco_ch_robot_zmq.py` extract the
 ch_robot MJCF and meshes from `origin/retargeting_holosoma` into:
@@ -388,7 +428,7 @@ the cached XML:
 python -c "from pathlib import Path; print(Path('.cache/ch_robot_model/ch_robot_10dof.xml').read_text()[:1000])"
 ```
 
-## 13. Validation Commands
+## 14. Validation Commands
 
 Syntax check:
 
@@ -444,7 +484,7 @@ python demos/demo_zmq_human_joint_publisher.py \
   --status-every 1
 ```
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### `launch_passive requires mjpython`
 
@@ -529,7 +569,7 @@ python -m pytest tests/test_ch_robot_retarget.py -q
 Do not run `wearable_imu/tests/...` directly from the repo root unless you set
 `PYTHONPATH` manually.
 
-## 15. Recommended Workflow
+## 16. Recommended Workflow
 
 At the start of a session:
 
