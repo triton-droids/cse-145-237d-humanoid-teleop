@@ -33,17 +33,17 @@ pieces needed to reproduce our class project.
 
 ## Repository Layout
 
-| Path | Purpose |
-|---|---|
-| `wearable_imu/` | Our BNO085 + ESP32-S3 wearable IMU pipeline, UDP packet parsing, filtering, calibration, IK, demos, and tests. |
-| `perception/depth_camera/` | Our Intel RealSense D435 + MediaPipe depth-backed pose-estimation baseline. |
-| `retargeting/` | Our Triton humanoid retargeting contract, `ch_robot` joint order, Holosoma notes, and portable patch files. |
-| `simulation/` | Our pointer to the dedicated Isaac Lab simulation repository and pinned simulation commit. |
-| `data/retargeting_samples/` | Our small sample retargeting captures used for validation. |
-| `data/retargeting_experiments/` | Our curated small converted outputs that verify retargeting and conversion contracts. |
-| `docs/` | Our architecture, replication, repository organization, and project overview docs. |
-| `reports/` | Our CSE 145/237D reports, presentations, and final deliverables. |
-| `media/` | Our demo videos and images used for reports and presentations. |
+| Path                            | Purpose                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `wearable_imu/`                 | Our BNO085 + ESP32-S3 wearable IMU pipeline, UDP packet parsing, filtering, calibration, IK, demos, and tests. |
+| `perception/depth_camera/`      | Our Intel RealSense D435 + MediaPipe depth-backed pose-estimation baseline.                                    |
+| `retargeting/`                  | Our Triton humanoid retargeting contract, `ch_robot` joint order, Holosoma notes, and portable patch files.    |
+| `simulation/`                   | Our pointer to the dedicated Isaac Lab simulation repository and pinned simulation commit.                     |
+| `data/retargeting_samples/`     | Our small sample retargeting captures used for validation.                                                     |
+| `data/retargeting_experiments/` | Our curated small converted outputs that verify retargeting and conversion contracts.                          |
+| `docs/`                         | Our architecture, replication, repository organization, and project overview docs.                             |
+| `reports/`                      | Our CSE 145/237D reports, presentations, and final deliverables.                                               |
+| `media/`                        | Our demo videos and images used for reports and presentations.                                                 |
 
 ## Current Status
 
@@ -77,13 +77,13 @@ project-specific contract, notes, and patches.
 
 ## Source Branches
 
-| Source | Integrated Area | Notes |
-|---|---|---|
-| `origin/inverse-kinematics` | `wearable_imu/` | Our real-world IMU packet, calibration, IK, demo, test, recording, and playback code. Latest inspected tip: `66a6454` (`fix UI scaling`). |
-| `origin/depthCamera` | `perception/depth_camera/` | Our RealSense D435 + MediaPipe depth-backed pose-estimation baseline. |
-| `origin/retargeting_data` | `data/retargeting_samples/` | Our small JSONL captures for retargeting validation. |
+| Source                        | Integrated Area                    | Notes                                                                                                                                                        |
+| ----------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `origin/inverse-kinematics`   | `wearable_imu/`                    | Our real-world IMU packet, calibration, IK, demo, test, recording, and playback code. Latest inspected tip: `66a6454` (`fix UI scaling`).                    |
+| `origin/depthCamera`          | `perception/depth_camera/`         | Our RealSense D435 + MediaPipe depth-backed pose-estimation baseline.                                                                                        |
+| `origin/retargeting_data`     | `data/retargeting_samples/`        | Our small JSONL captures for retargeting validation.                                                                                                         |
 | `origin/retargeting_holosoma` | `retargeting/` plus branch pointer | Our complete Holosoma worktree and live retargeting instructions. Latest inspected tip: `2bc4b3c` (`added penalties for flat feet on parallel retargeting`). |
-| `triton-droids/simulation` | `simulation/README.md` link only | We keep Isaac Lab training source, robot assets, logs, and generated files in the dedicated simulation repository. |
+| `triton-droids/simulation`    | `simulation/README.md` link only   | We keep Isaac Lab training source, robot assets, logs, and generated files in the dedicated simulation repository.                                           |
 
 ## Data Contracts
 
@@ -208,7 +208,7 @@ branch-local setup in `RUN_RETARGETING_LIVE.md` on
 
 ## Engineering Boundaries
 
-We keep this integration branch small and course-facing:
+We keep this integration branch small:
 
 - we keep portable contracts, docs, patches, tests, small samples, and final media
 - we do not vendor the full Holosoma source tree here
