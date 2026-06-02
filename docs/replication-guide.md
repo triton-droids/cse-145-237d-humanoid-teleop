@@ -5,7 +5,7 @@ This guide gives the high-level steps needed to reproduce the project.
 ## Hardware
 
 - 5 wearable IMU nodes using BNO085 orientation sensors and ESP32-S3 microcontrollers
-- Jetson Nano or equivalent robot-side computer
+- Laptop (or any host on the same hotspot) as the UDP receiver; a robot-side Jetson is the eventual on-robot target
 - Triton humanoid robot model
 - Optional Intel RealSense D435 camera for the RGB-D baseline
 
@@ -19,7 +19,7 @@ Typical flow:
 flash ESP32-S3 firmware
 assign sensor_id and segment_id
 stream BNO085 quaternion packets over UDP
-receive packets on Jetson
+receive packets on the laptop
 filter and smooth quaternions
 run neutral-pose calibration
 feed calibrated segment orientations into IK

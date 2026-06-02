@@ -33,7 +33,7 @@ Wearable IMUs / RGB-D camera
 ## Current Status
 
 - Wearable IMU hardware path: BNO085 quaternion streaming over ESP32-S3 UDP is scaffolded.
-- Jetson-side packet parsing, latest-packet buffering, filtering, smoothing, and neutral calibration are implemented.
+- Receiver-side (laptop) packet parsing, latest-packet buffering, filtering, smoothing, and neutral calibration are implemented.
 - Lower-body orientation IK and MuJoCo synthetic test harness exist for validation.
 - RealSense D435 + MediaPipe baseline estimates depth-backed pose landmarks.
 - Triton humanoid retargeting contract and CH robot Holosoma converter patch are documented.
@@ -60,7 +60,7 @@ Triton Droids, UC San Diego.
 | Fong-Yu (Yang) Lin | ML Engineer | RL, policy & reward functions, Sim2Sim (IsaacLab → MuJoCo), data pipeline |
 | Cindy Chen | ML Engineer | Human pose extraction, 3D keypoint retargeting, Holosoma pipeline |
 | Parth Trivedi | Embedded Engineer | IMU + ESP32 hardware, Jetson integration, depth estimation baseline |
-| Neal Jian | Embedded Engineer | ESP32 firmware, UART/wireless pipeline, IK from quaternions, battery design |
+| Neal Jian | Embedded Engineer | Wearable IMU hardware & battery design, ESP32 firmware, UART/wireless pipeline, IK from quaternions, motion retargeting, free-root walking |
 | Tauhid Malik | Embedded Engineer | IMU aggregation pipeline, Jetson networking, hardware bring-up |
 
 ## CSE 145/237D Materials

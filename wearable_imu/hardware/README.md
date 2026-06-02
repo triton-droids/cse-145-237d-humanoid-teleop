@@ -17,6 +17,9 @@ The BNO085 can provide fused quaternion reports directly. We should preserve
 the raw reported quaternion and metadata, then normalize ordering and frame
 meaning in `sensor/`.
 
+Per-node power (one 18650 cell, TP4056 charger, MT3608 boost) is documented in
+[`power.md`](power.md).
+
 Responsibilities:
 
 - connect to physical sensors
@@ -25,6 +28,19 @@ Responsibilities:
 - read quaternion reports
 - attach timestamps and quality/status information
 - pass packets forward without doing IK or calibration
+
+## Physical Node Assembly
+
+Each node is hand-built on a PCB protoboard ("breadboard" perfboard):
+
+- the ESP32-S3 and the BNO085 breakout are soldered to the protoboard
+- the MT3608 boost output is soldered to a power switch on the same board, so
+  the switch gates power to the whole node
+- the assembled board is then attached to a buckle strap, which fastens around
+  the body segment
+
+Buckle straps are used so a node can be mounted, removed, and re-seated per
+session. Per-node power parts and the power chain are in [`power.md`](power.md).
 
 ## Network Architecture
 
@@ -43,7 +59,15 @@ ESP32-S3 right foot  /
 The pelvis ESP32-S3 is not the hub in the current design. The phone hotspot only
 provides Wi-Fi connectivity; each ESP32 sends its own UDP packets to the
 receiver IP. The packet contract supports the full seven-segment layout shown
-above; the current MVP can also run a smaller active subset.
+above; the current MVP runs the five-node `shanks` subset.
+
+Network budget: each node sends one 40-byte packet at 100 Hz = ~3.9 KB/s of
+application payload. The MVP five-node set is ~19.5 KB/s, and the full seven-node
+set ~27.3 KB/s. With UDP/IP/802.11 headers the on-air load is roughly double, so
+even seven nodes stay well under any 2.4 GHz Wi-Fi limit; in practice the
+bottleneck is per-node latency/jitter, not aggregate bandwidth. Measured live,
+each node streams a steady ~100 Hz with zero drops once Wi-Fi modem sleep is
+disabled in firmware (`WiFi.setSleep(false)`).
 
 ## ESP32 Firmware
 
@@ -190,6 +214,13 @@ the BNO08x report interface, including rotation-vector quaternion reports.
 Do not use I2C for this pairing, and do not use UART-RVC for the solver path.
 UART-RVC is a different simplified mode and does not provide the quaternion
 report path we are building around.
+
+Report configuration (from the firmware):
+
+- report: `SH2_ROTATION_VECTOR` — the magnetometer-fused rotation vector, which
+  gives an absolute (drift-resistant) yaw reference.
+- rate: 100 Hz (`REPORT_INTERVAL_US = 10000`).
+- UART baud: 3,000,000 (`BNO08X_UART_BAUD`).
 
 Default wiring:
 

@@ -6,7 +6,7 @@ Current demos:
 
 - `demo_launcher.py`: clickable Tk launcher for the main wearable IMU demo
   workflows
-- `demo_udp_quaternion_receiver.py`: Jetson-side UDP monitor for ESP32-S3
+- `demo_udp_quaternion_receiver.py`: receiver-side UDP monitor for ESP32-S3
   BNO085 quaternion packets, with receive jitter and drop estimates
 - `demo_udp_latency_ping.py`: round-trip UDP ping latency test for one ESP32-S3
   node

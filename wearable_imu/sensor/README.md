@@ -58,7 +58,7 @@ Current identity assumptions:
 - valid lower-body segment IDs are `0..6`.
 - `255` means unknown/unassigned.
 
-Run the first Jetson-side receiver demo:
+Run the first receiver-side demo:
 
 ```powershell
 conda run -p .\.conda python demos\demo_udp_quaternion_receiver.py

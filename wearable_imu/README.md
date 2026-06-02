@@ -11,7 +11,7 @@ The target hardware path is:
 
 ```text
 BNO085 quaternion streams on the active ESP32-S3 nodes
-    -> direct Wi-Fi UDP to Jetson Nano
+    -> direct Wi-Fi UDP to laptop receiver
     -> sensor packet normalization
     -> neutral-pose and functional calibration
     -> sensor-to-segment alignment
@@ -28,8 +28,10 @@ real-world wearable pipeline.
 The BNO085 provides fused orientation quaternions directly. Our current input
 contract is therefore quaternion packets, not raw accel/gyro fusion.
 
-Each ESP32-S3 streams directly to the Jetson over UDP. The pelvis ESP32 is not
-the hub in the first architecture; it is just another sensor node.
+Each ESP32-S3 streams directly to the laptop receiver over UDP. (A robot-side
+Jetson is the eventual target once we move onto the humanoid; until then the
+receiver is whatever laptop is on the same hotspot.) The pelvis ESP32 is not the
+hub in the first architecture; it is just another sensor node.
 
 Expected packet shape:
 
@@ -69,9 +71,19 @@ Segment IDs:
 255 unknown
 ```
 
-The software contract supports the full seven-segment lower-body set. The
-current hardware MVP can run with a five-node subset while still using the same
-packet format and segment IDs.
+The software contract supports the full seven-segment lower-body set, and the
+demos expose three selectable subsets (see `PARTIAL_CONFIGS` in
+`demos/demo_partial_imu_live_viewer.py`):
+
+```text
+thighs (3 nodes): pelvis, left_thigh, right_thigh
+shanks (5 nodes): pelvis, left_thigh, right_thigh, left_shank, right_shank
+full   (7 nodes): pelvis + both thigh/shank/foot
+```
+
+The current hardware MVP runs the five-node `shanks` set (pelvis, both thighs,
+both shanks; feet estimated as neutral). All subsets use the same packet format
+and segment IDs.
 
 ## Wearable Placement
 Default placement for the lower-body setup:
@@ -84,33 +96,42 @@ Default placement for the lower-body setup:
 For quaternion-only IK, exact sensor position matters less than orientation. It
 will matter more later when we simulate or use accelerometer signals.
 
+Frame convention: the body/world frame is `+X` forward, `+Y` left, `+Z` up; the
+BNO085 sensor frame is `+X` device top, `+Y` device left edge, `+Z` out of the
+chip face. The fixed per-segment sensor-to-segment mount rotations and exact
+mounting orientations are defined in `ik/imu_orientation.py` and `model/`.
+
 ## Calibration Comes First
 Real sensors are not fixed to bones. They can be rotated on the strap, mounted
 slightly differently every session, and disturbed by soft tissue motion. Before
 IK, we need calibration.
 
-Recommended first calibration sequence:
+Calibration sequence (implemented):
 
 ```text
 1. stand neutral for 2-5 seconds
 2. average each sensor quaternion as the neutral reference
-3. align thigh/shank headings within each leg
-4. do slow knee flexion or squat samples
-5. estimate strap twist corrections from the knee hinge constraint
-6. save a calibration profile
+3. express live orientations relative to that neutral reference
 ```
 
-The calibration profile should contain:
+The `calibration.neutral.CalibrationProfile` captured per session contains:
 
 ```text
 CalibrationProfile:
-    user_height_optional
-    segment_lengths
-    neutral_sensor_quaternions
-    sensor_to_segment_rotations
-    leg_heading_corrections
-    knee_axis_estimates
-    ankle_axis_estimates_optional
+    neutral_orientations   # averaged neutral quaternion per segment_id
+    sensor_ids             # which physical board supplied each segment
+    sample_counts          # samples averaged per segment
+```
+
+The profile is held in memory for the running session; it is not yet persisted
+to disk. Richer functional calibration is planned but not implemented:
+
+```text
+planned (not yet implemented):
+    sensor_to_segment_rotations   # strap-twist correction
+    leg_heading_corrections       # thigh/shank heading alignment
+    knee_axis_estimates           # functional knee-hinge calibration
+    user_height / segment_lengths # anthropometric scaling
 ```
 
 ## Folder Workflows
@@ -151,7 +172,7 @@ conda run -p .\.conda python demos\demo_imu_orientation_ik.py
 The next real work should happen in this order:
 
 ```text
-1. flash one ESP32-S3/BNO085 node and receive UDP packets on the Jetson
+1. flash one ESP32-S3/BNO085 node and receive UDP packets on the laptop
 2. flash the active 5-node MVP set, or all 7 nodes for the full lower-body set,
    with unique sensor_id and segment_id settings
 3. tune quaternion spike filtering with real packet traces
@@ -170,7 +191,7 @@ people first, then tested with simulation as a convenience.
 Implemented so far:
 
 - ESP32-S3/BNO085 UDP packet firmware scaffold
-- Jetson-side binary quaternion packet parser
+- receiver-side binary quaternion packet parser
 - latest-packet UDP receiver buffer
 - quaternion norm/stale/spike filtering
 - SLERP smoothing
