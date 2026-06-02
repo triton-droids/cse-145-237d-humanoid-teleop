@@ -44,6 +44,18 @@ class RetargetingConfig:
     augmentation: bool = False
     """Whether to use augmentation."""
 
+    frame_start: int | None = None
+    """Optional first source frame to retarget, inclusive."""
+
+    frame_end: int | None = None
+    """Optional final source frame to retarget, exclusive."""
+
+    frame_count: int | None = None
+    """Optional number of frames to retarget starting at frame_start."""
+
+    middle_frames: int | None = None
+    """Optional centered frame window size. Overrides frame_start/frame_end/frame_count."""
+
     # --- Nested configs ---
     robot_config: RobotConfig = field(default_factory=lambda: RobotConfig(robot_type="g1"))
     """Robot configuration (nested - can override robot_urdf_file, robot_dof, etc.

@@ -22,7 +22,7 @@ if str(src_root) not in sys.path:
     sys.path.insert(0, str(src_root))
 
 from holosoma_retargeting.config_types.data_type import DEMO_JOINTS_REGISTRY, MotionDataConfig  # noqa: E402
-from holosoma_retargeting.config_types.retargeter import RetargeterConfig  # noqa: E402
+from holosoma_retargeting.config_types.retargeter import RetargeterConfig, StanceConfig  # noqa: E402
 from holosoma_retargeting.config_types.retargeting import RetargetingConfig  # noqa: E402
 from holosoma_retargeting.config_types.robot import RobotConfig  # noqa: E402
 from holosoma_retargeting.config_types.task import TaskConfig  # noqa: E402
@@ -450,6 +450,186 @@ def convert_object_poses_to_mujoco_order(object_poses: np.ndarray) -> np.ndarray
     return object_poses[:, [4, 5, 6, 0, 1, 2, 3]]
 
 
+def build_contact_confidence_sequence(
+    foot_sticking_sequences: list[dict[str, bool]],
+    stance_config: StanceConfig,
+) -> list[dict[str, float]]:
+    """Convert boolean foot contacts into smoothed stance confidence values."""
+    if not foot_sticking_sequences:
+        return []
+
+    keys = list(foot_sticking_sequences[0].keys())
+    num_frames = len(foot_sticking_sequences)
+    confidences = {key: np.zeros(num_frames, dtype=float) for key in keys}
+    min_contact_frames = max(1, int(stance_config.min_contact_frames))
+    ramp_frames = max(0, int(stance_config.ramp_frames))
+
+    for key in keys:
+        contact = np.array([bool(frame.get(key, False)) for frame in foot_sticking_sequences], dtype=bool)
+        i = 0
+        while i < num_frames:
+            if not contact[i]:
+                i += 1
+                continue
+
+            start = i
+            while i + 1 < num_frames and contact[i + 1]:
+                i += 1
+            end = i
+            length = end - start + 1
+
+            if length >= min_contact_frames:
+                values = np.ones(length, dtype=float)
+                ramp_len = min(ramp_frames, (length + 1) // 2)
+                if ramp_len > 0:
+                    ramp = np.linspace(1.0 / ramp_len, 1.0, ramp_len)
+                    values[:ramp_len] = ramp
+                    values[-ramp_len:] = np.minimum(values[-ramp_len:], ramp[::-1])
+                confidences[key][start : end + 1] = values
+            i += 1
+
+    return [{key: float(confidences[key][i]) for key in keys} for i in range(num_frames)]
+
+
+def _contact_confidence_for_side(contact_confidence: dict[str, float], side: str) -> float:
+    for key, value in contact_confidence.items():
+        key_lower = key.lower()
+        if side == "left" and (key_lower.startswith("l") or "left" in key_lower):
+            return float(value)
+        if side == "right" and (key_lower.startswith("r") or "right" in key_lower):
+            return float(value)
+    return 0.0
+
+
+def _weighted_mean(values: list[float], weights: list[float]) -> float:
+    if not values:
+        return 0.0
+    value_array = np.asarray(values, dtype=float)
+    weight_array = np.asarray(weights, dtype=float)
+    weight_sum = float(weight_array.sum())
+    if weight_sum <= 1e-12:
+        return float(value_array.mean())
+    return float(np.average(value_array, weights=weight_array))
+
+
+def log_stance_diagnostics(
+    retargeter: InteractionMeshRetargeter,
+    qpos: np.ndarray,
+    stance_contact_confidences: list[dict[str, float]],
+    stance_config: StanceConfig,
+) -> None:
+    """Log contact-weighted stance metrics for a completed retargeting run."""
+    if qpos.size == 0 or not stance_contact_confidences:
+        return
+
+    foot_links_by_side = {
+        "left": [link for link in retargeter.task_constants.FOOT_STICKING_LINKS if "left" in link.lower()],
+        "right": [link for link in retargeter.task_constants.FOOT_STICKING_LINKS if "right" in link.lower()],
+    }
+    q_init_joints = np.asarray(retargeter.task_constants.Q_INIT_JOINTS, dtype=float)
+    knee_targets = {"left": float(q_init_joints[3]), "right": float(q_init_joints[8])} if q_init_joints.size >= 9 else {}
+
+    root_target = float(qpos[0, 2])
+    root_errors: list[float] = []
+    root_weights: list[float] = []
+    spread_values: dict[str, list[float]] = {"left": [], "right": []}
+    ground_errors: dict[str, list[float]] = {"left": [], "right": []}
+    knee_errors: dict[str, list[float]] = {"left": [], "right": []}
+    side_weights: dict[str, list[float]] = {"left": [], "right": []}
+
+    num_frames = min(len(qpos), len(stance_contact_confidences))
+    for frame_idx in range(num_frames):
+        q = qpos[frame_idx]
+        confidence = stance_contact_confidences[frame_idx]
+        root_confidence = max(
+            _contact_confidence_for_side(confidence, "left"),
+            _contact_confidence_for_side(confidence, "right"),
+        )
+        if root_confidence > 0.0:
+            root_errors.append(abs(float(q[2]) - root_target))
+            root_weights.append(root_confidence)
+
+        for side, links in foot_links_by_side.items():
+            side_confidence = _contact_confidence_for_side(confidence, side)
+            if side_confidence <= 0.0 or not links:
+                continue
+
+            positions = retargeter._get_robot_link_positions(q, links)
+            heights = positions[:, 2]
+            spread_values[side].append(float(heights.max() - heights.min()))
+            ground_errors[side].append(abs(float(heights.mean()) - stance_config.z_floor))
+            side_weights[side].append(side_confidence)
+
+            knee_qpos_idx = 10 if side == "left" else 15
+            if side in knee_targets and knee_qpos_idx < len(q):
+                knee_errors[side].append(abs(float(q[knee_qpos_idx]) - knee_targets[side]))
+
+    logger.info(
+        "Stance diagnostics: root_height_dev_mean=%.4f",
+        _weighted_mean(root_errors, root_weights),
+    )
+    for side in ("left", "right"):
+        logger.info(
+            "Stance diagnostics %s: sole_height_range_mean=%.4f, sole_mean_z_error=%.4f, knee_angle_dev=%.4f",
+            side,
+            _weighted_mean(spread_values[side], side_weights[side]),
+            _weighted_mean(ground_errors[side], side_weights[side]),
+            _weighted_mean(knee_errors[side], side_weights[side][: len(knee_errors[side])]),
+        )
+
+
+def resolve_frame_window(cfg: RetargetingConfig, num_frames: int) -> tuple[int, int] | None:
+    """Resolve optional source-frame slicing config to an exclusive frame window."""
+    if cfg.middle_frames is not None:
+        if cfg.middle_frames <= 0:
+            raise ValueError(f"middle_frames must be positive, got {cfg.middle_frames}")
+        count = min(cfg.middle_frames, num_frames)
+        start = max(0, (num_frames - count) // 2)
+        return start, start + count
+
+    if cfg.frame_start is None and cfg.frame_end is None and cfg.frame_count is None:
+        return None
+
+    start = 0 if cfg.frame_start is None else cfg.frame_start
+    if start < 0:
+        raise ValueError(f"frame_start must be non-negative, got {start}")
+
+    if cfg.frame_count is not None:
+        if cfg.frame_count <= 0:
+            raise ValueError(f"frame_count must be positive, got {cfg.frame_count}")
+        end = start + cfg.frame_count
+        if cfg.frame_end is not None and cfg.frame_end != end:
+            raise ValueError("Use either frame_count or frame_end, or make frame_end equal frame_start + frame_count.")
+    else:
+        end = num_frames if cfg.frame_end is None else cfg.frame_end
+
+    if end <= start:
+        raise ValueError(f"frame window must be non-empty, got [{start}, {end})")
+    if start >= num_frames:
+        raise ValueError(f"frame_start {start} is outside sequence with {num_frames} frames")
+
+    return start, min(end, num_frames)
+
+
+def apply_frame_window(
+    human_joints: np.ndarray,
+    object_poses: np.ndarray,
+    frame_window: tuple[int, int] | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Slice source motion arrays using an exclusive frame window."""
+    if frame_window is None:
+        return human_joints, object_poses
+    start, end = frame_window
+    return human_joints[start:end], object_poses[start:end]
+
+
+def frame_window_suffix(frame_window: tuple[int, int] | None) -> str:
+    if frame_window is None:
+        return ""
+    start, end = frame_window
+    return f"_frames_{start}_{end - 1}"
+
+
 def build_retargeter_kwargs_from_config(
     retargeter_config: RetargeterConfig,
     constants: SimpleNamespace,
@@ -476,6 +656,7 @@ def build_retargeter_kwargs_from_config(
         "activate_obj_non_penetration": retargeter_config.activate_obj_non_penetration,
         "activate_foot_sticking": retargeter_config.activate_foot_sticking,
         "foot_lock": retargeter_config.foot_lock,
+        "stance": retargeter_config.stance,
         "penetration_tolerance": retargeter_config.penetration_tolerance,
         "foot_sticking_tolerance": retargeter_config.foot_sticking_tolerance,
         "self_collision": retargeter_config.self_collision,
@@ -584,6 +765,7 @@ def determine_output_path(
     save_dir: Path,
     task_name: str,
     augmentation: bool,
+    frame_window: tuple[int, int] | None = None,
 ) -> str:
     """Determine output file path based on task and augmentation.
     Args:
@@ -594,11 +776,12 @@ def determine_output_path(
     Returns:
         Output file path
     """
+    suffix = frame_window_suffix(frame_window)
     if task_type == "robot_only":
-        return str(save_dir / f"{task_name}.npz")
-    if task_type in ("object_interaction", "climbing"):
-        suffix = "_augmented" if augmentation else "_original"
         return str(save_dir / f"{task_name}{suffix}.npz")
+    if task_type in ("object_interaction", "climbing"):
+        aug_suffix = "_augmented" if augmentation else "_original"
+        return str(save_dir / f"{task_name}{aug_suffix}{suffix}.npz")
     raise ValueError(f"Unknown task type: {task_type}")
 
 
@@ -650,6 +833,15 @@ def main(cfg: RetargetingConfig) -> None:
     human_joints, object_poses, smpl_scale = load_motion_data(
         task_type, data_format, data_path, task_name, constants, cfg.motion_data_config
     )
+    frame_window = resolve_frame_window(cfg, human_joints.shape[0])
+    if frame_window is not None:
+        human_joints, object_poses = apply_frame_window(human_joints, object_poses, frame_window)
+        logger.info(
+            "Using source frame window [%d, %d) -> %d frames",
+            frame_window[0],
+            frame_window[1],
+            human_joints.shape[0],
+        )
 
     # Get toe names from motion data config (depends only on data_format)
     toe_names = cfg.motion_data_config.toe_names
@@ -708,6 +900,13 @@ def main(cfg: RetargetingConfig) -> None:
         for fs in foot_sticking_sequences:
             fs["L_Toe"], fs["R_Toe"] = fs["R_Toe"], fs["L_Toe"]
 
+    stance_contact_confidences = None
+    if cfg.retargeter.stance.enable:
+        stance_contact_confidences = build_contact_confidence_sequence(foot_sticking_sequences, cfg.retargeter.stance)
+        foot_sticking_sequences = [
+            {key: confidence >= 0.5 for key, confidence in frame.items()} for frame in stance_contact_confidences
+        ]
+
     # Task-specific foot sticking adjustments
     if task_type == "object_interaction":
         # Disable initial sticking
@@ -715,22 +914,25 @@ def main(cfg: RetargetingConfig) -> None:
         foot_sticking_sequences[0][toe_names[1]] = False
 
     # Determine output path
-    dest_res_path = determine_output_path(task_type, save_dir, task_name, cfg.augmentation)
+    dest_res_path = determine_output_path(task_type, save_dir, task_name, cfg.augmentation, frame_window)
 
     # Retarget motion
     logger.info("Starting retargeting...")
-    retargeter.retarget_motion(
+    retargeted_motion, _, _, _ = retargeter.retarget_motion(
         human_joint_motions=human_joints,
         object_poses=object_poses,
         object_poses_augmented=object_poses_augmented,
         object_points_local_demo=object_local_pts_demo,
         object_points_local=object_local_pts,
         foot_sticking_sequences=foot_sticking_sequences,
+        stance_contact_confidences=stance_contact_confidences,
         q_a_init=q_init,
         q_nominal_list=q_nominal,
         original=not cfg.augmentation,
         dest_res_path=dest_res_path,
     )
+    if cfg.retargeter.stance.enable and stance_contact_confidences is not None:
+        log_stance_diagnostics(retargeter, retargeted_motion, stance_contact_confidences, cfg.retargeter.stance)
     logger.info("Retargeting complete. Results saved to: %s", dest_res_path)
 
     if cfg.retargeter.visualize or cfg.retargeter.debug:

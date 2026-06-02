@@ -16,7 +16,7 @@ from scipy.spatial.transform import Rotation  # type: ignore[import-untyped]
 from tqdm import tqdm
 from viser.extras import ViserUrdf  # type: ignore[import-not-found]
 
-from holosoma_retargeting.config_types.retargeter import FootLockConfig, SelfCollisionConfig
+from holosoma_retargeting.config_types.retargeter import FootLockConfig, SelfCollisionConfig, StanceConfig
 
 # Add src to path for direct execution
 src_path = Path(__file__).parent.parent / "src"
@@ -60,6 +60,7 @@ class InteractionMeshRetargeter:
         penetration_tolerance: float = 1e-3,
         foot_sticking_tolerance: float = 1e-3,
         foot_lock: FootLockConfig | None = None,
+        stance: StanceConfig | None = None,
         self_collision: SelfCollisionConfig | None = None,
         visualize: bool = False,
         debug: bool = False,
@@ -112,6 +113,8 @@ class InteractionMeshRetargeter:
         # Tolerance for foot sticking constraints in x, y.
         self.foot_sticking_tolerance = foot_sticking_tolerance
         self._init_foot_lock(foot_lock)
+        self.stance = stance or StanceConfig()
+        self._stance_root_height_target: float | None = None
         self._self_collision_config = self_collision
 
         # Setup visualization if requested
@@ -192,6 +195,19 @@ class InteractionMeshRetargeter:
         self.w_nominal_tracking_init = w_nominal_tracking_init
         self.nominal_tracking_tau = nominal_tracking_tau
         self.track_nominal_indices = task_constants.NOMINAL_TRACKING_INDICES
+        self._init_stance_posture_targets()
+
+    def _init_stance_posture_targets(self) -> None:
+        """Initialize robot-specific stance posture targets."""
+        self._stance_knee_qpos_indices: dict[str, int] = {}
+        self._stance_knee_targets: dict[str, float] = {}
+        self._stance_qpos_to_reduced = {int(qpos_idx): i for i, qpos_idx in enumerate(self.q_a_indices)}
+
+        if getattr(self.task_constants, "ROBOT_NAME", "").startswith("ch_robot"):
+            self._stance_knee_qpos_indices = {"left": 10, "right": 15}
+            q_init_joints = np.asarray(getattr(self.task_constants, "Q_INIT_JOINTS", np.zeros(0)), dtype=float)
+            if q_init_joints.size >= 9:
+                self._stance_knee_targets = {"left": float(q_init_joints[3]), "right": float(q_init_joints[8])}
 
     def _init_foot_lock(self, foot_lock: FootLockConfig | None) -> None:
         """Initialize foot lock configuration and normalize window mappings."""
@@ -394,6 +410,7 @@ class InteractionMeshRetargeter:
         object_points_local_demo,
         object_points_local,
         foot_sticking_sequences,
+        stance_contact_confidences=None,
         q_a_init=None,
         q_nominal_list=None,
         original=True,
@@ -409,6 +426,7 @@ class InteractionMeshRetargeter:
             object_points_local_demo (np.ndarray): Demo object points in local frame (rest pose).
             object_points_local (np.ndarray): Current object points in local frame (rest pose).
             foot_sticking_sequences (list): List of foot sticking sequences for each frame.
+            stance_contact_confidences (list): Optional per-frame contact confidence dictionaries.
             q_a_init (np.ndarray, optional): Initial robot configuration.
             q_a_nominal (np.ndarray, optional): Nominal robot configuration.
 
@@ -444,6 +462,7 @@ class InteractionMeshRetargeter:
         if self.has_dynamic_object:
             q_locked_list[:, -7:] = object_poses_augmented
         q = np.copy(q_locked_list[0])
+        self._stance_root_height_target = float(q[2])
         retargeted_motions = [q]
 
         tetrahedra = []
@@ -510,6 +529,9 @@ class InteractionMeshRetargeter:
                     adj_list=adj_list,
                     obj_pts_local=object_points_local,
                     foot_sticking=foot_sticking_sequences[i],
+                    stance_contact_confidence=(
+                        stance_contact_confidences[i] if stance_contact_confidences is not None else None
+                    ),
                     w_nominal_tracking=w_nominal_tracking,
                     q_a_nominal=(q_nominal_list[i, self.q_a_indices] if q_nominal_list is not None else None),
                     init_t=i == 0,
@@ -577,8 +599,8 @@ class InteractionMeshRetargeter:
                 @show_meshes_cb.on_update
                 def _(_):
                     self.viser_robot.show_visual = show_meshes_cb.value
-                    if self.viser_object is not None:
-                        self.viser_object.show_visual = show_meshes_cb.value
+            if self.viser_object is not None:
+                self.viser_object.show_visual = show_meshes_cb.value
 
         return (
             np.array(retargeted_motions)[1:],
@@ -586,6 +608,114 @@ class InteractionMeshRetargeter:
             obj_pts_list,
             tetrahedra,
         )
+
+    @staticmethod
+    def _contact_confidence_for_side(stance_contact_confidence: dict[str, float] | None, side: str) -> float:
+        """Read a left/right contact confidence from a generic contact dictionary."""
+        if not stance_contact_confidence:
+            return 0.0
+        for key, value in stance_contact_confidence.items():
+            key_lower = key.lower()
+            if side == "left" and (key_lower.startswith("l") or "left" in key_lower):
+                return float(value)
+            if side == "right" and (key_lower.startswith("r") or "right" in key_lower):
+                return float(value)
+        return 0.0
+
+    @staticmethod
+    def _side_from_link_name(link_name: str) -> str | None:
+        link_lower = link_name.lower()
+        if "left" in link_lower:
+            return "left"
+        if "right" in link_lower:
+            return "right"
+        return None
+
+    @staticmethod
+    def _is_foot_tracking_key(demo_key: str, link_name: str) -> bool:
+        text = f"{demo_key} {link_name}".lower()
+        return any(token in text for token in ("foot", "toe", "ankle"))
+
+    def _laplacian_vertex_weights(
+        self,
+        robot_link_keys: list[str],
+        num_object_points: int,
+        stance_contact_confidence: dict[str, float] | None,
+    ) -> np.ndarray:
+        """Build per-vertex Laplacian weights, downweighting stance foot tracking."""
+        robot_weights = self.laplacian_weights * np.ones(len(robot_link_keys), dtype=float)
+        if self.stance.enable:
+            for i, demo_key in enumerate(robot_link_keys):
+                link_name = self.laplacian_match_links[demo_key]
+                side = self._side_from_link_name(link_name)
+                if side is None or not self._is_foot_tracking_key(demo_key, link_name):
+                    continue
+                confidence = self._contact_confidence_for_side(stance_contact_confidence, side)
+                multiplier = 1.0 - confidence * (1.0 - self.stance.foot_tracking_weight_multiplier)
+                robot_weights[i] *= multiplier
+
+        if num_object_points == 0:
+            return robot_weights
+        return np.concatenate([robot_weights, self.laplacian_weights * np.ones(num_object_points, dtype=float)])
+
+    def _qpos_expr(self, qpos_idx: int, dqa, q_a_n_last: np.ndarray):
+        reduced_idx = self._stance_qpos_to_reduced.get(int(qpos_idx))
+        if reduced_idx is None:
+            return None
+        return q_a_n_last[reduced_idx] + dqa[reduced_idx]
+
+    def _stance_posture_obj_terms(
+        self,
+        dqa,
+        q_a_n_last: np.ndarray,
+        J_WF_dict: dict[str, np.ndarray],
+        p_WF_dict: dict[str, np.ndarray],
+        stance_contact_confidence: dict[str, float] | None,
+    ) -> list:
+        """Create stance-aware flat-foot, root-height, and knee-posture objective terms."""
+        if not self.stance.enable:
+            return []
+
+        obj_terms = []
+        side_confidences = {
+            side: self._contact_confidence_for_side(stance_contact_confidence, side) for side in ("left", "right")
+        }
+
+        root_confidence = max(side_confidences.values())
+        root_expr = self._qpos_expr(2, dqa, q_a_n_last)
+        if root_confidence > 0 and root_expr is not None and self._stance_root_height_target is not None:
+            obj_terms.append(
+                root_confidence
+                * self.stance.root_height_weight
+                * cp.square(root_expr - self._stance_root_height_target)
+            )
+
+        for side, confidence in side_confidences.items():
+            if confidence <= 0:
+                continue
+
+            z_exprs = []
+            for key, J_WF in J_WF_dict.items():
+                if self._side_from_link_name(key) != side:
+                    continue
+                z_exprs.append(float(p_WF_dict[key][2]) + J_WF[2, :] @ dqa)
+
+            if z_exprs:
+                z_stack = cp.hstack(z_exprs)
+                z_mean = cp.sum(z_stack) / len(z_exprs)
+                obj_terms.append(
+                    confidence * self.stance.flat_foot_weight * cp.sum_squares(z_stack - z_mean)
+                )
+                obj_terms.append(confidence * self.stance.sole_ground_weight * cp.square(z_mean - self.stance.z_floor))
+
+            knee_qpos_idx = self._stance_knee_qpos_indices.get(side)
+            knee_target = self._stance_knee_targets.get(side)
+            if knee_qpos_idx is not None and knee_target is not None:
+                knee_expr = self._qpos_expr(knee_qpos_idx, dqa, q_a_n_last)
+                if knee_expr is not None:
+                    obj_terms.append(confidence * self.stance.knee_posture_weight * cp.square(knee_expr - knee_target))
+
+        return obj_terms
 
     def solve_single_iteration(
         self,
@@ -596,6 +726,7 @@ class InteractionMeshRetargeter:
         adj_list: list[list[int]],
         obj_pts_local: np.ndarray,
         foot_sticking: tuple[bool, bool],
+        stance_contact_confidence: dict[str, float] | None = None,
         w_nominal_tracking: float = 0.0,
         q_a_nominal: np.ndarray | None = None,
         verbose=False,
@@ -649,7 +780,7 @@ class InteractionMeshRetargeter:
         lap0_vec = lap0.reshape(-1)  # (3V,)
         target_lap_vec = target_laplacian.reshape(-1)  # (3V,)
 
-        w_v = (self.laplacian_weights * np.ones(V)).astype(float)  # (V,)
+        w_v = self._laplacian_vertex_weights(robot_link_keys, V_o, stance_contact_confidence).astype(float)  # (V,)
         sqrt_w3 = np.sqrt(np.repeat(w_v, 3))
 
         # Decision variables
@@ -658,6 +789,8 @@ class InteractionMeshRetargeter:
 
         # Constraints list
         constraints = []
+        foot_lock_obj_terms = []
+        stance_obj_terms = []
 
         # Linear equality (J_L is already reduced to q_a_indices columns by _calc_manipulator_jacobians)
         constraints += [cp.Constant(J_L) @ dqa - lap_var == -lap0_vec]
@@ -665,7 +798,8 @@ class InteractionMeshRetargeter:
         # Foot constraints (sticking + foot lock window Z pinning)
         apply_foot_sticking = (self.q_a_init_idx < 12) and self.activate_foot_sticking
         apply_foot_lock = (self.q_a_init_idx < 12) and self.foot_lock.enable
-        if apply_foot_sticking or apply_foot_lock:
+        apply_stance = (self.q_a_init_idx < 12) and self.stance.enable
+        if apply_foot_sticking or apply_foot_lock or apply_stance:
             J_WF_dict, p_WF_dict, _ = self._calc_manipulator_jacobians(q, links=self.foot_links, obj_frame=False)
 
             # Foot sticking: constrain XY to stay near previous frame position
@@ -695,7 +829,9 @@ class InteractionMeshRetargeter:
                             Jxy @ dqa <= p_ub[:2],
                         ]
 
-            # Foot lock windows: pin Z to floor within configured frame ranges
+            # Foot lock windows: pin Z to floor within configured frame ranges.
+            # Soft mode is useful for noisy mocap contacts where hard pinning can
+            # make the local SQP subproblem infeasible.
             if apply_foot_lock:
                 for key, J_WF in J_WF_dict.items():
                     if not self._is_foot_locked_in_window(key, frame_idx):
@@ -704,10 +840,25 @@ class InteractionMeshRetargeter:
                     z_anchor = self.foot_lock.z_floor
                     z_delta = z_anchor - p_WF_dict[key][2]
                     Jz = J_WF[2, :]  # already reduced to q_a_indices cols
-                    constraints += [
-                        Jz @ dqa >= z_delta - self.foot_lock.tolerance,
-                        Jz @ dqa <= z_delta + self.foot_lock.tolerance,
-                    ]
+                    z_error = Jz @ dqa - z_delta
+                    if self.foot_lock.soft:
+                        foot_lock_obj_terms.append(self.foot_lock.weight * cp.square(z_error))
+                    else:
+                        constraints += [
+                            z_error >= -self.foot_lock.tolerance,
+                            z_error <= self.foot_lock.tolerance,
+                        ]
+
+            if apply_stance:
+                stance_obj_terms.extend(
+                    self._stance_posture_obj_terms(
+                        dqa=dqa,
+                        q_a_n_last=q_a_n_last,
+                        J_WF_dict=J_WF_dict,
+                        p_WF_dict=p_WF_dict,
+                        stance_contact_confidence=stance_contact_confidence,
+                    )
+                )
 
         # Non-penetration constraints
         if self.activate_obj_non_penetration:
@@ -741,6 +892,8 @@ class InteractionMeshRetargeter:
         obj_terms = []
 
         obj_terms.append(cp.sum_squares(cp.multiply(sqrt_w3, lap_var - target_lap_vec)))
+        obj_terms.extend(foot_lock_obj_terms)
+        obj_terms.extend(stance_obj_terms)
 
         # nominal tracking for selected indices
         if (w_nominal_tracking > 0) and (q_a_nominal is not None):
@@ -863,6 +1016,7 @@ class InteractionMeshRetargeter:
         adj_list: list[list[int]],
         obj_pts_local: np.ndarray,
         foot_sticking: tuple[bool, bool],
+        stance_contact_confidence: dict[str, float] | None = None,
         w_nominal_tracking: float = 0.0,
         q_a_nominal: np.ndarray | None = None,
         init_t: bool = False,
@@ -881,6 +1035,7 @@ class InteractionMeshRetargeter:
                 adj_list=adj_list,
                 obj_pts_local=obj_pts_local,
                 foot_sticking=foot_sticking,
+                stance_contact_confidence=stance_contact_confidence,
                 q_a_nominal=q_a_nominal,
                 w_nominal_tracking=w_nominal_tracking,
                 init_t=init_t,

@@ -22,6 +22,44 @@ class FootLockConfig:
     tolerance: float = 5e-3
     """Tolerance for Z floor pinning constraints."""
 
+    soft: bool = False
+    """Use a soft quadratic Z floor penalty instead of hard Z pinning constraints."""
+
+    weight: float = 100.0
+    """Weight for soft Z floor pinning when soft is enabled."""
+
+
+@dataclass(frozen=True)
+class StanceConfig:
+    """Configuration for stance-aware flat-foot retargeting costs."""
+
+    enable: bool = False
+    """Whether to enable stance-aware flat-foot retargeting."""
+
+    ramp_frames: int = 8
+    """Frames used to ramp stance costs in and out near contact transitions."""
+
+    min_contact_frames: int = 6
+    """Minimum contact segment length retained for stance costs."""
+
+    flat_foot_weight: float = 200.0
+    """Weight for reducing stance-side sole marker height spread."""
+
+    sole_ground_weight: float = 50.0
+    """Weight for pulling stance-side sole marker mean height to z_floor."""
+
+    root_height_weight: float = 25.0
+    """Weight for keeping root height near the initial retargeting height during stance."""
+
+    knee_posture_weight: float = 10.0
+    """Weight for keeping stance-side knee near the robot nominal pose."""
+
+    foot_tracking_weight_multiplier: float = 0.15
+    """Multiplier for stance-side human foot/toe Laplacian tracking weights."""
+
+    z_floor: float = 0.004
+    """Target stance sole marker height."""
+
 
 @dataclass(frozen=True)
 class SelfCollisionConfig:
@@ -78,6 +116,9 @@ class RetargeterConfig:
 
     foot_lock: FootLockConfig = field(default_factory=FootLockConfig)
     """Configuration for explicit frame-range based foot locking."""
+
+    stance: StanceConfig = field(default_factory=StanceConfig)
+    """Configuration for stance-aware flat-foot retargeting."""
 
     step_size: float = 0.2
     """Trust region for each SQP iteration."""
