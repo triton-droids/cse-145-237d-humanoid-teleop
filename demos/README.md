@@ -118,6 +118,30 @@ raw, uncalibrated pose, and the live view keeps running the whole time:
   freely; periodic redraws pause while you rotate or move the window to avoid
   flicker.
 
+### Free-root (translating pelvis)
+
+By default the pelvis is **pinned** in place — the skeleton shows posture but not
+travel across the floor. Enable **`--free-root`** (the "Free-root pelvis / walk"
+checkbox in the launcher) to let the pelvis move as you walk:
+
+```bash
+python demos/demo_partial_imu_live_viewer.py --config full --free-root
+python demos/demo_record_human_joint_clip.py --config full --free-root --duration-s 10
+```
+
+It uses **foot-contact anchoring** (zero-velocity update): each frame the planted
+foot is held fixed in the world and the pelvis position is solved up the leg
+chain; when the stance foot switches, the anchor hands off to the new foot, so
+all joints stay in one consistent world frame even after moving around. The core
+lives in `ik/free_root.py` and reuses the existing aggregation, so the
+fixed-pelvis path is unchanged.
+
+Caveats (it's kinematics, not a perfect tracker): contact is detected from
+orientation only (lowest + slowest ankle), so it's tuned for flat-ground walking;
+heading/yaw **drift** accumulates over time (a magnetometer limitation); and it
+works best with the **full** 7-IMU set so both feet are tracked. The recorded
+`.npz` schema is unchanged — `root_pos_w` simply stops being constant.
+
 ---
 
 ## Notes

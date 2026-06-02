@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from calibration.neutral import CalibrationProfile, NeutralCalibrationAccumulator  # noqa: E402
 from ik.imu_orientation import default_lower_limb_mounts, front_pelvis_mount  # noqa: E402
+from ik.free_root import FreeRootTracker  # noqa: E402
 from ik.lower_body_aggregation import LowerBodySkeleton, aggregate_lower_body_skeleton  # noqa: E402
 from sensor.filtering import QuaternionPacketFilter  # noqa: E402
 from sensor.packet import SegmentId  # noqa: E402
@@ -98,6 +99,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-age-ms", type=float, default=150.0)
     parser.add_argument("--min-samples", type=int, default=20)
     parser.add_argument("--calibration-delay-s", type=float, default=1.0)
+    parser.add_argument(
+        "--free-root",
+        action="store_true",
+        help="Record a translating pelvis (foot-contact anchoring) instead of a "
+        "pinned one. Best with the full IMU set.",
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -297,6 +304,10 @@ def main() -> None:
         next_sample_time = start_time
         target_frames = max(1, int(round(args.duration_s * args.fps)))
 
+        # Free-root: translating pelvis from foot-contact anchoring (default off).
+        free_root = FreeRootTracker() if args.free_root else None
+        last_frame_s = start_time
+
         timestamps_s: list[float] = []
         point_frames_w: list[np.ndarray] = []
         point_frames_origin: list[np.ndarray] = []
@@ -327,7 +338,14 @@ def main() -> None:
                 skipped += 1
                 continue
 
-            skeleton = aggregate_lower_body_skeleton(segment_orientations)
+            if free_root is not None:
+                pelvis_center = free_root.update(segment_orientations, dt=now - last_frame_s)
+                last_frame_s = now
+                skeleton = aggregate_lower_body_skeleton(
+                    segment_orientations, pelvis_center=pelvis_center
+                )
+            else:
+                skeleton = aggregate_lower_body_skeleton(segment_orientations)
             points_w = ml_joint_positions_w(skeleton)
             if origin_w is None:
                 origin_w = pelvis_ground_origin_w(points_w)

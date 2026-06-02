@@ -189,6 +189,9 @@ DEMOS: tuple[DemoSpec, ...] = (
             Field("record_duration_s", "Record seconds", "--record-duration-s", placeholder="10"),
             Field("record_output", "Output .npz", "--record-output", placeholder="data/recordings/live_human_joint_clip.npz"),
         ),
+        toggles=(
+            Toggle("free_root", "Free-root pelvis / walk (--free-root)", "--free-root"),
+        ),
     ),
     DemoSpec(
         key="play-human-joint-clip",

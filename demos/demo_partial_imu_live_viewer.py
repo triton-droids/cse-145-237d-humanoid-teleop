@@ -33,6 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from calibration.neutral import CalibrationProfile, NeutralCalibrationAccumulator  # noqa: E402
 from ik.imu_orientation import default_lower_limb_mounts, front_pelvis_mount  # noqa: E402
+from ik.free_root import FreeRootTracker  # noqa: E402
 from ik.lower_body_aggregation import aggregate_lower_body_skeleton  # noqa: E402
 from sensor.filtering import QuaternionPacketFilter  # noqa: E402
 from sensor.packet import SegmentId  # noqa: E402
@@ -134,6 +135,12 @@ def parse_args() -> argparse.Namespace:
         default=10.0,
         help="Max 3D redraw rate. Kept low so the loop prioritizes recording; "
         "the live view is just a sanity check, not a smooth animation.",
+    )
+    parser.add_argument(
+        "--free-root",
+        action="store_true",
+        help="Let the pelvis translate as you walk (foot-contact anchoring) "
+        "instead of pinning it in place. Best with the full IMU set.",
     )
     parser.add_argument(
         "--record-output",
@@ -324,6 +331,57 @@ def main() -> None:
     }
     ax.legend(loc="upper left", fontsize=8)
 
+    # --- world reference (free-root only) -------------------------------
+    # A floor grid at z=0, a marker at the world origin, and a breadcrumb trail
+    # of past pelvis positions. With the camera following the pelvis, these
+    # static-in-world elements are what make the travel visible (otherwise a
+    # centered, follow-cam skeleton looks like marching in place).
+    GRID_SPACING = 0.5      # metres between floor grid lines
+    GRID_HALF_LINES = 8     # lines each side of the camera centre
+    floor_lines: list = []
+    origin_marker = None
+    pelvis_trail = None
+    trail_xyz: list[np.ndarray] = []
+    if args.free_root:
+        # Mute matplotlib's own panes + back-wall gridlines so they don't
+        # compete with our floor grid (only the z=0 grid should read as ground).
+        for _axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+            _axis._axinfo["grid"]["color"] = (1, 1, 1, 0)
+            _axis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+        for _ in range(2 * (2 * GRID_HALF_LINES + 1)):
+            (gl,) = ax.plot([], [], [], color="#5b6b7a", linewidth=1.0, alpha=0.9, zorder=1)
+            floor_lines.append(gl)
+        # World origin: a small upright marker so "where you started" stays
+        # visible as you walk away from it.
+        (origin_marker,) = ax.plot(
+            [0, 0], [0, 0], [0, 0.15],
+            color="#b5651d", linewidth=3, marker="o", markersize=5, zorder=4,
+        )
+        (pelvis_trail,) = ax.plot(
+            [], [], [], color="#c44", linewidth=1.6, linestyle="dotted", zorder=3,
+        )
+
+    def _update_world(px: float, py: float) -> None:
+        """Redraw the floor grid + trail around the current pelvis x/y."""
+        # Snap the grid to spacing so lines appear to scroll under the body.
+        cx = round(px / GRID_SPACING) * GRID_SPACING
+        cy = round(py / GRID_SPACING) * GRID_SPACING
+        span = GRID_HALF_LINES * GRID_SPACING
+        idx = 0
+        for i in range(-GRID_HALF_LINES, GRID_HALF_LINES + 1):
+            # lines parallel to x (vary x, fixed y)
+            y = cy + i * GRID_SPACING
+            gl = floor_lines[idx]; idx += 1
+            gl.set_data([cx - span, cx + span], [y, y]); gl.set_3d_properties([0, 0])
+            # lines parallel to y (vary y, fixed x)
+            x = cx + i * GRID_SPACING
+            gl = floor_lines[idx]; idx += 1
+            gl.set_data([x, x], [cy - span, cy + span]); gl.set_3d_properties([0, 0])
+        if pelvis_trail is not None and trail_xyz:
+            arr = np.asarray(trail_xyz)
+            pelvis_trail.set_data(arr[:, 0], arr[:, 1])
+            pelvis_trail.set_3d_properties(arr[:, 2])
+
     status_text = ax.text2D(
         0.02, 0.02, "", transform=ax.transAxes,
         va="bottom", fontsize=8, family="monospace",
@@ -375,6 +433,11 @@ def main() -> None:
     clear_button = Button(clear_button_ax, "Clear calibration")
     record_button = Button(record_button_ax, "Record")
     stop_record_button = Button(stop_record_button_ax, "Stop rec")
+
+    # Free-root: a translating pelvis solved from foot-contact anchoring. When
+    # off (default) the pelvis stays pinned and behaviour is unchanged. Stored in
+    # state so (re)calibration can reset its world origin.
+    free_root = FreeRootTracker() if args.free_root else None
 
     state: dict = {
         "profile": None,
@@ -497,6 +560,10 @@ def main() -> None:
         )
         if profile is not None:
             state["profile"] = profile
+            # New neutral pose = new world origin for the translating pelvis.
+            if free_root is not None:
+                free_root.reset()
+                trail_xyz.clear()
         state["calibrating"] = False
 
     def start_calibration(_event=None) -> None:
@@ -584,6 +651,7 @@ def main() -> None:
     draw_period = 1.0 / args.draw_fps if args.draw_fps > 0 else float("inf")
     last_draw = 0.0
     latest_skeleton = None  # most recent skeleton, reused by the throttled draw
+    last_frame_s = time.monotonic()
 
     while plt.fignum_exists(fig.number):
         with filter_lock:
@@ -596,7 +664,15 @@ def main() -> None:
         now = time.monotonic()
         fresh = seg_orients is not None
         if fresh:
-            skeleton = aggregate_lower_body_skeleton(seg_orients)
+            if free_root is not None:
+                dt = now - last_frame_s
+                pelvis_center = free_root.update(seg_orients, dt=dt)
+                skeleton = aggregate_lower_body_skeleton(
+                    seg_orients, pelvis_center=pelvis_center
+                )
+            else:
+                skeleton = aggregate_lower_body_skeleton(seg_orients)
+            last_frame_s = now
             latest_skeleton = skeleton
 
             # --- capture: at most one fresh sample per iteration, independent
@@ -671,6 +747,21 @@ def main() -> None:
                     else:
                         _set(f"{key}_est", estimated[key])
                         lines[key].set_visible(False)
+
+                # In free-root mode the pelvis travels, so pan the camera to keep
+                # it framed (x/y follow; z stays floor-anchored) and refresh the
+                # world reference (floor grid + breadcrumb trail). All of this is
+                # inside the throttled draw block, so it never touches capture.
+                if free_root is not None:
+                    px, py, _pz = latest_skeleton.pelvis_center
+                    ax.set_xlim(px - 0.6, px + 0.6)
+                    ax.set_ylim(py - 0.6, py + 0.6)
+                    pelvis_pt = np.asarray(latest_skeleton.pelvis_center, dtype=float)
+                    if not trail_xyz or np.linalg.norm(pelvis_pt - trail_xyz[-1]) > 0.01:
+                        trail_xyz.append(pelvis_pt.copy())
+                        if len(trail_xyz) > 600:  # cap memory/draw cost
+                            del trail_xyz[0]
+                    _update_world(px, py)
 
                 age_info = "  ".join(
                     f"{s.name.lower()}: {1000*(now - buffer.packets[s].receive_time_s):.0f}ms"

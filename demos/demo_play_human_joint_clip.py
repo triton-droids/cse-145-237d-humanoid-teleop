@@ -5,9 +5,9 @@ Record button) and animates the joint positions. Includes a Play/Pause button
 and a frame scrub slider.
 
 Usage (from project root):
-  conda run --no-capture-output -n humanoid-sim python demos\demo_play_human_joint_clip.py data\recordings\live_human_joint_clip.npz
-  conda run --no-capture-output -n humanoid-sim python demos\demo_play_human_joint_clip.py data\recordings\human_joint_clip.npz --origin
-  conda run --no-capture-output -n humanoid-sim python demos\demo_play_human_joint_clip.py CLIP.npz --no-show   # print a summary and exit
+  conda run --no-capture-output -n humanoid-sim python demos/demo_play_human_joint_clip.py data/recordings/live_human_joint_clip.npz
+  conda run --no-capture-output -n humanoid-sim python demos/demo_play_human_joint_clip.py data/recordings/human_joint_clip.npz --origin
+  conda run --no-capture-output -n humanoid-sim python demos/demo_play_human_joint_clip.py CLIP.npz --no-show   # print a summary and exit
 """
 
 from __future__ import annotations
