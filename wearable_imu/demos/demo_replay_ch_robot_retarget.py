@@ -28,7 +28,7 @@ for path in (PROJECT_ROOT, REPO_ROOT):
 from ik.ch_robot_retarget import (  # noqa: E402
     CH_ROBOT_JOINT_NAMES,
     human_joint_clip_to_qpos_qvel,
-    load_human_joint_clip,
+    load_human_joint_source,
 )
 
 
@@ -42,7 +42,7 @@ _RIGHT_CHAIN = (_R_HIP, _R_KNEE, _R_ANKLE, _R_TOE)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clip", type=Path, help="Recorded human_joint_clip_*.npz path.")
+    parser.add_argument("clip", type=Path, help="Recorded human_joint_clip_*.npz or camera .jsonl path.")
     parser.add_argument(
         "--frame-key",
         choices=("joint_pos_origin", "joint_pos_w"),
@@ -83,7 +83,7 @@ def _print_summary(args: argparse.Namespace, points: np.ndarray, qpos: np.ndarra
 
 def main() -> None:
     args = parse_args()
-    clip = load_human_joint_clip(args.clip, frame_key=args.frame_key)
+    clip = load_human_joint_source(args.clip, frame_key=args.frame_key)
     qpos, qvel = human_joint_clip_to_qpos_qvel(
         clip,
         base_height=args.base_height,

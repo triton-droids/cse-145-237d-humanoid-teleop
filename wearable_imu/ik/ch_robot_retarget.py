@@ -16,6 +16,7 @@ this for hardware control.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Literal, Mapping, Protocol
 
@@ -79,6 +80,18 @@ HUMAN_JOINT_NAMES: tuple[str, ...] = (
     "RightLeg",
     "RightFoot",
     "RightToeBase",
+)
+
+SMPLH_CAMERA_REQUIRED_JOINTS: tuple[str, ...] = (
+    "pelvis",
+    "left_hip",
+    "left_knee",
+    "left_ankle",
+    "left_foot",
+    "right_hip",
+    "right_knee",
+    "right_ankle",
+    "right_foot",
 )
 
 SPINE1_IDX = 0
@@ -278,6 +291,15 @@ def joint_positions_to_qpos(
     )
 
 
+def load_human_joint_source(path: str | Path, *, frame_key: str = "joint_pos_origin") -> HumanJointClip:
+    """Load a recorded IMU/camera handoff source as a 9-joint clip."""
+
+    source_path = Path(path)
+    if source_path.suffix == ".jsonl":
+        return load_smplh_camera_jsonl(source_path)
+    return load_human_joint_clip(source_path, frame_key=frame_key)
+
+
 def load_human_joint_clip(path: str | Path, *, frame_key: str = "joint_pos_origin") -> HumanJointClip:
     """Load a recorded IMU handoff ``.npz`` clip."""
 
@@ -321,6 +343,70 @@ def load_human_joint_clip(path: str | Path, *, frame_key: str = "joint_pos_origi
     )
 
 
+def load_smplh_camera_jsonl(path: str | Path) -> HumanJointClip:
+    """Load camera JSONL lower-body joints into the 9-point handoff layout.
+
+    The camera file reports world coordinates as ``[X right, Y forward/away,
+    Z up]``.  For the recorded captures used here, the person faces the camera,
+    so body-frame handoff coordinates are reconstructed as
+    ``[X forward, Y left, Z up] = [-camera_Y, camera_X, camera_Z]``.
+    """
+
+    source_path = Path(path)
+    frames: list[np.ndarray] = []
+    timestamps_ms: list[float] = []
+
+    with source_path.open("r", encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            joints_world = record.get("joints_world")
+            if not isinstance(joints_world, dict):
+                raise ValueError(f"{source_path}:{line_number} missing joints_world object")
+
+            missing = [name for name in SMPLH_CAMERA_REQUIRED_JOINTS if name not in joints_world]
+            if missing:
+                raise ValueError(f"{source_path}:{line_number} missing joints: {missing}")
+
+            try:
+                frame = np.vstack(
+                    [
+                        _camera_world_to_human_frame(joints_world["pelvis"]),
+                        _camera_world_to_human_frame(joints_world["left_hip"]),
+                        _camera_world_to_human_frame(joints_world["left_knee"]),
+                        _camera_world_to_human_frame(joints_world["left_ankle"]),
+                        _camera_world_to_human_frame(joints_world["left_foot"]),
+                        _camera_world_to_human_frame(joints_world["right_hip"]),
+                        _camera_world_to_human_frame(joints_world["right_knee"]),
+                        _camera_world_to_human_frame(joints_world["right_ankle"]),
+                        _camera_world_to_human_frame(joints_world["right_foot"]),
+                    ]
+                )
+            except ValueError:
+                continue
+            frames.append(frame)
+            timestamps_ms.append(float(record.get("timestamp_ms", len(frames) - 1)))
+
+    if not frames:
+        raise ValueError(f"{source_path} contains no complete lower-body frames")
+
+    joint_positions = np.stack(frames).astype(np.float64)
+    timestamps_s = np.asarray(timestamps_ms, dtype=np.float64)
+    timestamps_s = (timestamps_s - timestamps_s[0]) / 1000.0
+    fps = _fps_from_timestamps(timestamps_s)
+
+    return HumanJointClip(
+        joint_positions=joint_positions,
+        root_quat_wxyz=None,
+        timestamps_s=timestamps_s,
+        fps=fps,
+        joint_names=HUMAN_JOINT_NAMES,
+        frame_key="smplh_camera_jsonl",
+    )
+
+
 def human_joint_clip_to_qpos_qvel(
     clip: HumanJointClip,
     *,
@@ -350,6 +436,24 @@ def human_joint_clip_to_qpos_qvel(
         qvel_frames.append(qvel)
 
     return np.stack(qpos_frames), np.stack(qvel_frames)
+
+
+def _camera_world_to_human_frame(point_xyz: object) -> np.ndarray:
+    camera = np.asarray(point_xyz, dtype=np.float64)
+    if camera.shape != (3,) or not np.all(np.isfinite(camera)):
+        raise ValueError(f"camera joint point must have shape (3,), got {camera.shape}")
+    x_right, y_forward, z_up = camera
+    return np.array([-y_forward, x_right, z_up], dtype=np.float64)
+
+
+def _fps_from_timestamps(timestamps_s: np.ndarray) -> float:
+    if timestamps_s.shape[0] < 2:
+        return 30.0
+    deltas = np.diff(timestamps_s)
+    valid = deltas[deltas > 0.0]
+    if valid.size == 0:
+        return 30.0
+    return float(1.0 / np.mean(valid))
 
 
 def qpos_to_qvel(previous_qpos: np.ndarray, current_qpos: np.ndarray, dt_s: float) -> np.ndarray:

@@ -31,6 +31,8 @@ from .ch_robot_retarget import (
     joint_positions_to_qpos,
     legposes_to_qpos,
     load_human_joint_clip,
+    load_human_joint_source,
+    load_smplh_camera_jsonl,
     qpos_to_qvel,
     twist_about_axis,
 )
@@ -53,6 +55,8 @@ __all__ = [
     "joint_positions_to_qpos",
     "legposes_to_qpos",
     "load_human_joint_clip",
+    "load_human_joint_source",
+    "load_smplh_camera_jsonl",
     "LowerLimbJointRotations",
     "LowerLimbOrientationSolution",
     "default_lower_limb_mounts",

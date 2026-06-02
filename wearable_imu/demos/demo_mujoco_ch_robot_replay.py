@@ -40,7 +40,7 @@ from ik.ch_robot_retarget import (  # noqa: E402
     CH_ROBOT_JOINT_NAMES,
     QPOS_WIDTH,
     human_joint_clip_to_qpos_qvel,
-    load_human_joint_clip,
+    load_human_joint_source,
 )
 
 
@@ -53,7 +53,7 @@ FLOOR_MATERIAL_NAME = "floor_grid"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=Path, help="human_joint_clip_*.npz or ch_robot qpos replay .npz.")
+    parser.add_argument("input", type=Path, help="human_joint_clip_*.npz, camera .jsonl, or ch_robot qpos replay .npz.")
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_CACHE)
     parser.add_argument("--refresh-model", action="store_true", help="Re-extract ch_robot assets from retargeting_holosoma.")
     parser.add_argument("--speed", type=float, default=1.0)
@@ -196,8 +196,12 @@ def _find_named(parent: ET.Element, tag: str, name: str) -> ET.Element | None:
 
 
 def load_replay_input(path: Path, *, frame_key: str, yaw_mode: str, base_height: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, str]:
-    data = np.load(path, allow_pickle=True)
-    if "qpos" in data.files:
+    if path.suffix == ".npz":
+        data = np.load(path, allow_pickle=True)
+    else:
+        data = None
+
+    if data is not None and "qpos" in data.files:
         qpos = np.asarray(data["qpos"], dtype=np.float64)
         if qpos.ndim != 2 or qpos.shape[1] != QPOS_WIDTH:
             raise ValueError(f"qpos must have shape (frames, {QPOS_WIDTH}), got {qpos.shape}")
@@ -209,13 +213,13 @@ def load_replay_input(path: Path, *, frame_key: str, yaw_mode: str, base_height:
         timestamps = _timestamps_from_data(data, qpos.shape[0], fps)
         return qpos, qvel, timestamps, fps, "ch_robot_qpos"
 
-    clip = load_human_joint_clip(path, frame_key=frame_key)
+    clip = load_human_joint_source(path, frame_key=frame_key)
     qpos, qvel = human_joint_clip_to_qpos_qvel(
         clip,
         base_height=base_height,
         yaw_mode=yaw_mode,
     )
-    return qpos, qvel, clip.timestamps_s, clip.fps, f"human_joint_clip:{frame_key}"
+    return qpos, qvel, clip.timestamps_s, clip.fps, clip.frame_key
 
 
 def _timestamps_from_data(data: np.lib.npyio.NpzFile, n_frames: int, fps: float) -> np.ndarray:

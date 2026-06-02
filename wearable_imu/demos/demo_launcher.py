@@ -234,7 +234,7 @@ DEMOS: tuple[DemoSpec, ...] = (
         key="replay-ch-robot-retarget",
         title="Replay ch_robot Retarget",
         script=PROJECT_ROOT / "demos" / "demo_replay_ch_robot_retarget.py",
-        description="Replay a recorded human_joint_clip .npz through Plan A and visualize ch_robot joint angles.",
+        description="Replay a recorded human_joint_clip .npz or camera .jsonl through Plan A and visualize ch_robot joint angles.",
         notes="Enter the recorded clip path below. Use Save .npz to export qpos/qvel.",
         options=(
             OptionGroup(
@@ -253,7 +253,7 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip .npz", "", placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("clip", "Clip path", "", placeholder="../data/smplh_capture_3.jsonl"),
             Field("save_output", "Save .npz", "--save-output", placeholder="../data/ch_robot_replay_qpos.npz"),
             Field("speed", "Speed", "--speed", placeholder="1.0"),
         ),
@@ -285,7 +285,7 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("input", "Input .npz", "", placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("input", "Input path", "", placeholder="../data/smplh_capture_3.jsonl"),
             Field("speed", "Speed", "--speed", placeholder="1.0"),
         ),
         toggles=(
@@ -298,7 +298,7 @@ DEMOS: tuple[DemoSpec, ...] = (
         key="zmq-human-joint-publisher",
         title="ZMQ Human Joint Publisher",
         script=PROJECT_ROOT / "demos" / "demo_zmq_human_joint_publisher.py",
-        description="Publish a recorded human_joint_clip .npz as mock-live 9-joint frames over ZeroMQ.",
+        description="Publish a recorded human_joint_clip .npz or camera .jsonl as mock-live 9-joint frames over ZeroMQ.",
         notes="Run this first, then run the MuJoCo ZMQ subscriber.",
         options=(
             OptionGroup(
@@ -310,7 +310,7 @@ DEMOS: tuple[DemoSpec, ...] = (
             ),
         ),
         fields=(
-            Field("clip", "Clip .npz", "", placeholder="../data/human_joint_clip_20260601_231345.npz"),
+            Field("clip", "Clip path", "", placeholder="../data/smplh_capture_3.jsonl"),
             Field("endpoint", "Endpoint", "--endpoint", placeholder="tcp://127.0.0.1:5556"),
             Field("fps", "Publish FPS", "--fps", placeholder="50"),
             Field("max_frames", "Max frames", "--max-frames", placeholder="0"),

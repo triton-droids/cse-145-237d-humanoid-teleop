@@ -22,7 +22,7 @@ for path in (PROJECT_ROOT, REPO_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from ik.ch_robot_retarget import load_human_joint_clip  # noqa: E402
+from ik.ch_robot_retarget import load_human_joint_source  # noqa: E402
 from ik.zmq_human_joint_stream import (  # noqa: E402
     DEFAULT_HUMAN_JOINT_ENDPOINT,
     HUMAN_JOINT_TOPIC,
@@ -32,7 +32,7 @@ from ik.zmq_human_joint_stream import (  # noqa: E402
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clip", type=Path, help="Recorded human_joint_clip_*.npz path.")
+    parser.add_argument("clip", type=Path, help="Recorded human_joint_clip_*.npz or camera .jsonl path.")
     parser.add_argument("--endpoint", default=DEFAULT_HUMAN_JOINT_ENDPOINT)
     parser.add_argument("--frame-key", choices=("joint_pos_origin", "joint_pos_w"), default="joint_pos_origin")
     parser.add_argument("--fps", type=float, default=0.0, help="Publish rate. 0 uses clip fps.")
@@ -51,7 +51,7 @@ def main() -> None:
         raise ModuleNotFoundError("pyzmq is required. Install with: python -m pip install pyzmq") from exc
 
     args = parse_args()
-    clip = load_human_joint_clip(args.clip, frame_key=args.frame_key)
+    clip = load_human_joint_source(args.clip, frame_key=args.frame_key)
     fps = clip.fps if args.fps <= 0.0 else args.fps
     if fps <= 0.0:
         raise ValueError("publish fps must be greater than zero")

@@ -24,6 +24,8 @@ from ik.ch_robot_retarget import (
     joint_positions_to_qpos,
     legposes_to_qpos,
     load_human_joint_clip,
+    load_human_joint_source,
+    load_smplh_camera_jsonl,
     qpos_to_qvel,
     strip_robot_yaw,
     to_robot_frame,
@@ -197,6 +199,26 @@ def test_load_actual_recorded_clip_if_available() -> None:
     qpos, qvel = human_joint_clip_to_qpos_qvel(clip)
 
     assert clip.joint_names == HUMAN_JOINT_NAMES
+    assert qpos.shape == (clip.joint_positions.shape[0], QPOS_WIDTH)
+    assert qvel.shape == (clip.joint_positions.shape[0], QVEL_WIDTH)
+    assert np.all(np.isfinite(qpos))
+    assert np.all(np.isfinite(qvel))
+
+
+def test_load_actual_smplh_camera_jsonl_if_available() -> None:
+    path = REPO_ROOT / "data" / "smplh_capture_3.jsonl"
+    if not path.exists():
+        pytest.skip(f"camera JSONL clip not available: {path}")
+
+    clip = load_smplh_camera_jsonl(path)
+    qpos, qvel = human_joint_clip_to_qpos_qvel(clip)
+    generic = load_human_joint_source(path)
+
+    assert clip.joint_names == HUMAN_JOINT_NAMES
+    assert clip.joint_positions.shape[0] == 149
+    assert clip.joint_positions.shape[1:] == (len(HUMAN_JOINT_NAMES), 3)
+    assert clip.fps == pytest.approx(8.08, rel=0.05)
+    assert generic.frame_key == "smplh_camera_jsonl"
     assert qpos.shape == (clip.joint_positions.shape[0], QPOS_WIDTH)
     assert qvel.shape == (clip.joint_positions.shape[0], QVEL_WIDTH)
     assert np.all(np.isfinite(qpos))
