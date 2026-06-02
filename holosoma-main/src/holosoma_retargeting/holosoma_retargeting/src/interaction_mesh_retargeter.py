@@ -201,13 +201,18 @@ class InteractionMeshRetargeter:
         """Initialize robot-specific stance posture targets."""
         self._stance_knee_qpos_indices: dict[str, int] = {}
         self._stance_knee_targets: dict[str, float] = {}
+        self._stance_ankle_qpos_indices: dict[str, int] = {}
+        self._stance_ankle_targets: dict[str, float] = {}
         self._stance_qpos_to_reduced = {int(qpos_idx): i for i, qpos_idx in enumerate(self.q_a_indices)}
 
         if getattr(self.task_constants, "ROBOT_NAME", "").startswith("ch_robot"):
             self._stance_knee_qpos_indices = {"left": 10, "right": 15}
+            self._stance_ankle_qpos_indices = {"left": 11, "right": 16}
             q_init_joints = np.asarray(getattr(self.task_constants, "Q_INIT_JOINTS", np.zeros(0)), dtype=float)
             if q_init_joints.size >= 9:
                 self._stance_knee_targets = {"left": float(q_init_joints[3]), "right": float(q_init_joints[8])}
+            if q_init_joints.size >= 10:
+                self._stance_ankle_targets = {"left": float(q_init_joints[4]), "right": float(q_init_joints[9])}
 
     def _init_foot_lock(self, foot_lock: FootLockConfig | None) -> None:
         """Initialize foot lock configuration and normalize window mappings."""
@@ -642,7 +647,7 @@ class InteractionMeshRetargeter:
         num_object_points: int,
         stance_contact_confidence: dict[str, float] | None,
     ) -> np.ndarray:
-        """Build per-vertex Laplacian weights, downweighting stance foot tracking."""
+        """Build per-vertex Laplacian weights, downweighting foot tracking under stance mode."""
         robot_weights = self.laplacian_weights * np.ones(len(robot_link_keys), dtype=float)
         if self.stance.enable:
             for i, demo_key in enumerate(robot_link_keys):
@@ -651,7 +656,9 @@ class InteractionMeshRetargeter:
                 if side is None or not self._is_foot_tracking_key(demo_key, link_name):
                     continue
                 confidence = self._contact_confidence_for_side(stance_contact_confidence, side)
-                multiplier = 1.0 - confidence * (1.0 - self.stance.foot_tracking_weight_multiplier)
+                multiplier = self.stance.swing_foot_tracking_weight_multiplier + confidence * (
+                    self.stance.foot_tracking_weight_multiplier - self.stance.swing_foot_tracking_weight_multiplier
+                )
                 robot_weights[i] *= multiplier
 
         if num_object_points == 0:
@@ -672,7 +679,7 @@ class InteractionMeshRetargeter:
         p_WF_dict: dict[str, np.ndarray],
         stance_contact_confidence: dict[str, float] | None,
     ) -> list:
-        """Create stance-aware flat-foot, root-height, and knee-posture objective terms."""
+        """Create foot-leveling, ground-contact, and posture objective terms."""
         if not self.stance.enable:
             return []
 
@@ -691,9 +698,6 @@ class InteractionMeshRetargeter:
             )
 
         for side, confidence in side_confidences.items():
-            if confidence <= 0:
-                continue
-
             z_exprs = []
             for key, J_WF in J_WF_dict.items():
                 if self._side_from_link_name(key) != side:
@@ -703,10 +707,14 @@ class InteractionMeshRetargeter:
             if z_exprs:
                 z_stack = cp.hstack(z_exprs)
                 z_mean = cp.sum(z_stack) / len(z_exprs)
-                obj_terms.append(
-                    confidence * self.stance.flat_foot_weight * cp.sum_squares(z_stack - z_mean)
+                flat_weight = self.stance.swing_flat_foot_weight + confidence * (
+                    self.stance.flat_foot_weight - self.stance.swing_flat_foot_weight
                 )
-                obj_terms.append(confidence * self.stance.sole_ground_weight * cp.square(z_mean - self.stance.z_floor))
+                obj_terms.append(flat_weight * cp.sum_squares(z_stack - z_mean))
+                if confidence > 0:
+                    obj_terms.append(
+                        confidence * self.stance.sole_ground_weight * cp.square(z_mean - self.stance.z_floor)
+                    )
 
             knee_qpos_idx = self._stance_knee_qpos_indices.get(side)
             knee_target = self._stance_knee_targets.get(side)
@@ -714,6 +722,13 @@ class InteractionMeshRetargeter:
                 knee_expr = self._qpos_expr(knee_qpos_idx, dqa, q_a_n_last)
                 if knee_expr is not None:
                     obj_terms.append(confidence * self.stance.knee_posture_weight * cp.square(knee_expr - knee_target))
+
+            ankle_qpos_idx = self._stance_ankle_qpos_indices.get(side)
+            ankle_target = self._stance_ankle_targets.get(side)
+            if ankle_qpos_idx is not None and ankle_target is not None:
+                ankle_expr = self._qpos_expr(ankle_qpos_idx, dqa, q_a_n_last)
+                if ankle_expr is not None:
+                    obj_terms.append(self.stance.ankle_posture_weight * cp.square(ankle_expr - ankle_target))
 
         return obj_terms
 

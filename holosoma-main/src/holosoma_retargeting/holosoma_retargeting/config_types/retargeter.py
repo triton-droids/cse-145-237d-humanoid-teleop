@@ -45,6 +45,9 @@ class StanceConfig:
     flat_foot_weight: float = 200.0
     """Weight for reducing stance-side sole marker height spread."""
 
+    swing_flat_foot_weight: float = 30.0
+    """Weight for reducing sole marker height spread when the foot is not in stance."""
+
     sole_ground_weight: float = 50.0
     """Weight for pulling stance-side sole marker mean height to z_floor."""
 
@@ -54,8 +57,14 @@ class StanceConfig:
     knee_posture_weight: float = 10.0
     """Weight for keeping stance-side knee near the robot nominal pose."""
 
+    ankle_posture_weight: float = 8.0
+    """Weight for keeping ankle joints near the robot nominal pose across the motion."""
+
     foot_tracking_weight_multiplier: float = 0.15
     """Multiplier for stance-side human foot/toe Laplacian tracking weights."""
+
+    swing_foot_tracking_weight_multiplier: float = 0.5
+    """Multiplier for swing-side human foot/toe Laplacian tracking weights."""
 
     z_floor: float = 0.004
     """Target stance sole marker height."""

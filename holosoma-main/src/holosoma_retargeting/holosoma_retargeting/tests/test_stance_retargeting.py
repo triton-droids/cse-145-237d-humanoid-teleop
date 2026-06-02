@@ -29,7 +29,7 @@ def test_contact_confidence_ramps_and_thresholds_short_segments() -> None:
     assert all(frame["R_Toe"] == 0.0 for frame in confidence)
 
 
-def test_ch_robot_knee_qpos_indices_match_plan() -> None:
+def test_ch_robot_posture_qpos_indices_match_plan() -> None:
     model_path = (
         Path(__file__).resolve().parents[1]
         / "models"
@@ -41,6 +41,8 @@ def test_ch_robot_knee_qpos_indices_match_plan() -> None:
 
     assert joint_qpos["left_knee_joint"] == 10
     assert joint_qpos["right_knee_joint"] == 15
+    assert joint_qpos["left_ankle_joint"] == 11
+    assert joint_qpos["right_ankle_joint"] == 16
 
 
 def test_middle_frame_window_and_output_suffix() -> None:

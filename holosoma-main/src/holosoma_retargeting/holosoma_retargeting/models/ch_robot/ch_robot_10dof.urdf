@@ -105,6 +105,11 @@
     </visual>
   </link>
 
+  <link name="left_ankle_marker">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.01"/></geometry></visual>
+  </link>
+
   <!-- Left foot contact spheres -->
   <link name="left_foot_sphere_1_link">
     <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
@@ -197,6 +202,11 @@
     </visual>
   </link>
 
+  <link name="right_ankle_marker">
+    <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+    <visual><geometry><sphere radius="0.01"/></geometry></visual>
+  </link>
+
   <!-- Right foot contact spheres (mirror of left) -->
   <link name="right_foot_sphere_1_link">
     <inertial><origin xyz="0 0 0"/><mass value="0.001"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
@@ -273,6 +283,11 @@
     <dynamics damping="1.0"/>
   </joint>
 
+  <joint name="left_ankle_marker_joint" type="fixed">
+    <parent link="left_foot"/><child link="left_ankle_marker"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
   <!-- Left foot sphere joints (fixed) -->
   <joint name="left_foot_sphere_1_joint" type="fixed">
     <parent link="left_foot"/><child link="left_foot_sphere_1_link"/>
@@ -335,6 +350,11 @@
     <axis xyz="1.0 0.0 0.0"/>
     <limit lower="-1.57" upper="1.57" effort="100" velocity="5.0"/>
     <dynamics damping="1.0"/>
+  </joint>
+
+  <joint name="right_ankle_marker_joint" type="fixed">
+    <parent link="right_foot"/><child link="right_ankle_marker"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
   <!-- Right foot sphere joints (fixed, mirrored from left) -->
