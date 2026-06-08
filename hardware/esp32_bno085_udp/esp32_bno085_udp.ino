@@ -94,6 +94,21 @@
 #define BNO08X_UART_BAUD 3000000
 #endif
 
+// Optional hardware reset line to the BNO085 RST pin. The BNO085 is finicky at
+// power-up and can boot into a bad state, which shows up as "works after a few
+// reboots". Wiring RST to a spare GPIO and toggling it before begin_UART()
+// gives a clean, deterministic start. Set to the GPIO number once wired; leave
+// at -1 if RST is not connected (the firmware then just retries begin_UART).
+#ifndef BNO08X_RST_PIN
+#define BNO08X_RST_PIN -1
+#endif
+
+// How many times to retry bringing up the BNO085 before giving up for this
+// boot. With a reset line each retry also pulses RST.
+#ifndef BNO08X_BEGIN_RETRIES
+#define BNO08X_BEGIN_RETRIES 5
+#endif
+
 #ifndef WIFI_CONNECT_TIMEOUT_MS
 #define WIFI_CONNECT_TIMEOUT_MS 20000
 #endif
@@ -357,26 +372,59 @@ bool connectWiFi() {
   return false;
 }
 
-void setupBNO085() {
-  Serial1.begin(BNO08X_UART_BAUD, SERIAL_8N1, BNO08X_RX_PIN, BNO08X_TX_PIN);
-  delay(100);
+void pulseBNO085Reset() {
+  // Drive RST low to hold the BNO085 in reset, release, then wait for its
+  // power-on sequence. Only runs if a reset GPIO is configured.
+  if (BNO08X_RST_PIN < 0) {
+    return;
+  }
+  pinMode(BNO08X_RST_PIN, OUTPUT);
+  digitalWrite(BNO08X_RST_PIN, LOW);
+  delay(10);
+  digitalWrite(BNO08X_RST_PIN, HIGH);
+  delay(200);  // BNO085 needs time to boot before it answers on UART
+}
 
-  if (!bno08x.begin_UART(&Serial1)) {
-    Serial.println("Could not find BNO085 over UART");
-    Serial.println("Check wiring, BNO085 mode pins, and UART RX/TX crossing.");
-    setLed(ledColor(255, 0, 0));
-    while (true) {
-      delay(1000);
+// Bring up the BNO085 and enable the rotation-vector report. Retries (pulsing
+// RST each attempt when wired) instead of hanging forever, so an occasional bad
+// power-up self-recovers rather than requiring a manual reboot. Returns true on
+// success; the caller decides what to do on persistent failure.
+bool setupBNO085() {
+  for (int attempt = 1; attempt <= BNO08X_BEGIN_RETRIES; attempt++) {
+    pulseBNO085Reset();
+    Serial1.begin(BNO08X_UART_BAUD, SERIAL_8N1, BNO08X_RX_PIN, BNO08X_TX_PIN);
+    delay(150);
+
+    if (!bno08x.begin_UART(&Serial1)) {
+      Serial.print("BNO085 begin_UART failed (attempt ");
+      Serial.print(attempt);
+      Serial.print("/");
+      Serial.print(BNO08X_BEGIN_RETRIES);
+      Serial.println("). Check wiring, P1=high/P0=low mode pins, RX/TX crossing.");
+      Serial1.end();
+      delay(300);
+      continue;
     }
+
+    if (!bno08x.enableReport(SH2_ROTATION_VECTOR, REPORT_INTERVAL_US)) {
+      Serial.print("BNO085 enableReport failed (attempt ");
+      Serial.print(attempt);
+      Serial.print("/");
+      Serial.print(BNO08X_BEGIN_RETRIES);
+      Serial.println(").");
+      Serial1.end();
+      delay(300);
+      continue;
+    }
+
+    Serial.print("BNO085 up on attempt ");
+    Serial.println(attempt);
+    return true;
   }
 
-  if (!bno08x.enableReport(SH2_ROTATION_VECTOR, REPORT_INTERVAL_US)) {
-    Serial.println("Could not enable BNO085 rotation vector report");
-    setLed(ledColor(255, 0, 0));
-    while (true) {
-      delay(1000);
-    }
-  }
+  Serial.println("BNO085 did not start after retries.");
+  setLed(ledColor(255, 0, 0));
+  return false;
 }
 
 void sendQuaternionPacket(const sh2_SensorValue_t &sensorValue) {
@@ -693,7 +741,14 @@ void setup() {
     delay(5000);
   }
   udp.begin(ESP32_UDP_LOCAL_PORT);
-  setupBNO085();
+
+  // Keep trying to bring the IMU up rather than dead-locking on one bad
+  // power-up. Each setupBNO085() call already retries internally; if even that
+  // fails, wait and try the whole sequence again so a flaky boot self-recovers.
+  while (!setupBNO085()) {
+    Serial.println("Retrying BNO085 bring-up in 2 seconds...");
+    delay(2000);
+  }
 
   setLed(segmentLedColor(g_segment_id));
   Serial.println("Streaming BNO085 rotation-vector quaternions over UDP");
