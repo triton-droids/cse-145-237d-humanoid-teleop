@@ -45,8 +45,10 @@ from model.lower_body import LegPose
 from demos.demo_mujoco_ch_robot_replay import (
     FLOOR_MATERIAL_NAME,
     FLOOR_TEXTURE_NAME,
+    ensure_ch_robot_model,
     ensure_visible_floor,
 )
+from demos.demo_mujoco_ch_robot_live import apply_robot_state
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -434,6 +436,23 @@ def test_holosoma_branch_mjcf_contract_matches_live_retargeter() -> None:
         (1.0, 0.0, 0.0),
     )
     assert all(joint_range == pytest.approx((JOINT_LIMIT_LOW, JOINT_LIMIT_HIGH)) for _name, _axis, joint_range in joints)
+
+
+def test_live_viewer_applies_retargeted_state_to_ch_robot(tmp_path: Path) -> None:
+    import mujoco
+
+    xml_path = ensure_ch_robot_model(tmp_path / "ch_robot_model")
+    model = mujoco.MjModel.from_xml_path(str(xml_path))
+    data = mujoco.MjData(model)
+    qpos = legposes_to_qpos(_identity_joint_rotations())
+    qpos[7:] = np.linspace(-0.2, 0.2, len(CH_ROBOT_JOINT_NAMES))
+    qvel = np.linspace(-0.1, 0.1, QVEL_WIDTH)
+
+    apply_robot_state(model, data, qpos, qvel)
+
+    np.testing.assert_allclose(data.qpos, qpos)
+    np.testing.assert_allclose(data.qvel, qvel)
+    np.testing.assert_allclose(data.ctrl, qpos[7:])
 
 
 def test_to_robot_frame_uses_expected_basis_change() -> None:

@@ -230,12 +230,21 @@ matching `--host`/`--port` below.
 #   thighs = 3 IMUs, shanks = 5, full = 7
 python demos/demo_partial_imu_live_viewer.py --host 0.0.0.0 --port 5005 --config full
 
+# Direct live IMU retargeting on the ch_robot MuJoCo model.
+# The window opens first; the robot stays still until calibration completes.
+python demos/demo_mujoco_ch_robot_live.py --host 0.0.0.0 --port 5005 --config shanks --fps 50
+
 # Text-only packet monitor: rate, age, jitter, drops, raw quaternions
 python demos/demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
 
 # Round-trip latency ping to one node (pass the ESP32 IP from Serial Monitor)
 python demos/demo_udp_latency_ping.py 192.168.1.164 --port 5006
 ```
+
+On macOS, launching with `python` automatically relaunches the script with the
+`mjpython` executable from the active environment. Hold a neutral standing pose
+while the required IMUs connect and 20 calibration samples are collected. The
+robot starts following the live pose after `Live retargeting active` appears.
 
 See [`demos/README.md`](demos/README.md) for a full description of every demo
 and its flags.

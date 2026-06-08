@@ -421,6 +421,30 @@ Full 7-IMU config:
 python demos/demo_live_retarget.py --config full --output stdout --fps 100
 ```
 
+Direct five-IMU MuJoCo visualization, verified at 50 Hz:
+
+```bash
+python demos/demo_mujoco_ch_robot_live.py \
+  --host 0.0.0.0 \
+  --port 5005 \
+  --config shanks \
+  --fps 50
+```
+
+This command receives the device packets, calibrates, retargets, and updates
+the `ch_robot` MuJoCo model in one process. The window opens first with the
+robot standing still. Sensor reception and calibration run in the background;
+hold a neutral standing pose until the terminal prints:
+
+```text
+Calibration complete.
+Live retargeting active. Move to drive ch_robot.
+```
+
+On macOS, launching with `python` automatically switches to the active
+environment's `mjpython`. Use `--config full` for all seven IMUs or
+`--config thighs` for the pelvis and two thigh sensors.
+
 Send live retargeted frames to a UDP downstream process:
 
 ```bash

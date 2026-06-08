@@ -236,6 +236,38 @@ DEMOS: tuple[DemoSpec, ...] = (
         ),
     ),
     DemoSpec(
+        key="live-mujoco-ch-robot",
+        title="Live MuJoCo ch_robot",
+        script=PROJECT_ROOT / "demos" / "demo_mujoco_ch_robot_live.py",
+        description="Receive real IMU packets, retarget them, and drive the ch_robot MuJoCo viewer in real time.",
+        notes="Hold a neutral standing pose during calibration. The robot base stays fixed because IMUs do not provide global position.",
+        options=(
+            OptionGroup(
+                key="config",
+                label="IMU set",
+                flag="--config",
+                choices=("thighs", "shanks", "full"),
+                default="full",
+            ),
+            OptionGroup(
+                key="yaw_mode",
+                label="Base yaw",
+                flag="--yaw-mode",
+                choices=("keep", "strip"),
+                default="keep",
+            ),
+        ),
+        fields=(
+            Field("host", "Host", "--host", default=DEFAULT_UDP_HOST, placeholder="0.0.0.0"),
+            Field("port", "Port", "--port", default=DEFAULT_IMU_PORT, placeholder="5005"),
+            Field("fps", "Viewer FPS", "--fps", default="100", placeholder="100"),
+        ),
+        toggles=(
+            Toggle("no_calibration", "Skip calibration", "--no-calibration"),
+            Toggle("refresh_model", "Refresh model", "--refresh-model"),
+        ),
+    ),
+    DemoSpec(
         key="replay-ch-robot-retarget",
         title="Replay ch_robot Retarget",
         script=PROJECT_ROOT / "demos" / "demo_replay_ch_robot_retarget.py",

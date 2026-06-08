@@ -72,6 +72,7 @@ receiver (see [`hardware/README.md`](../hardware/README.md)).
 |---|---|---|
 | `demo_partial_imu_live_viewer.py` | Live lower-body skeleton from real IMU packets; missing distal segments are estimated (dashed). Includes Calibrate, Clear calibration, Record, and Stop rec buttons. In the launcher this is a single entry — pick the IMU set with the **IMU set** radio buttons on the right. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--max-age-ms`, `--min-samples`, `--record-duration-s`, `--record-fps`, `--record-output` |
 | `demo_live_retarget.py` | Headless live Plan A bridge: IMU packets -> calibrated lower-body skeleton -> ch_robot `qpos[17]` and `qvel[16]`, emitted as JSON lines over stdout or UDP. | `--config {thighs,shanks,full}`, `--output {stdout,udp,none}`, `--target-host`, `--target-port`, `--fps`, `--yaw-mode {keep,strip}` |
+| `demo_mujoco_ch_robot_live.py` | Direct live visualization: real IMU packets -> calibration -> ch_robot retargeting -> MuJoCo viewer in one process. | `--config {thighs,shanks,full}`, `--host`, `--port`, `--fps`, `--yaw-mode {keep,strip}`, `--no-calibration` |
 | `demo_replay_ch_robot_retarget.py` | Replay a recorded `human_joint_clip_*.npz` or camera `.jsonl` clip through Plan A, visualize the skeleton, and show source human/root values plus resulting ch_robot joint angles. | positional `clip`, `--save-output`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--hide-input-data`, `--no-show` |
 | `demo_mujoco_ch_robot_replay.py` | Replay a recorded IMU/camera handoff clip or saved ch_robot qpos replay on the real Holosoma `ch_robot_10dof.xml` MuJoCo model. Auto-extracts XML/meshes from `retargeting_holosoma` into `.cache/`. | positional `input`, `--speed`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--no-show`, `--refresh-model` |
 | `demo_compare_human_clip_ch_robot.py` | Open the raw human `.npz` skeleton player and retargeted ch_robot MuJoCo replay together for before/after inspection. | positional `clip`, `--speed`, `--human-origin`, `--frame-key {joint_pos_origin,joint_pos_w}`, `--yaw-mode {keep,strip}`, `--base-motion {root_xy_forward,root_xy,fixed,root_xyz}`, `--no-show` |
@@ -98,6 +99,9 @@ python demos/demo_live_retarget.py --config shanks --output stdout --fps 100
 
 # Live ch_robot qpos/qvel over UDP
 python demos/demo_live_retarget.py --config full --output udp --target-host 127.0.0.1 --target-port 6010
+
+# Receive the five pelvis/thigh/shank IMUs and drive ch_robot at 50 Hz
+python demos/demo_mujoco_ch_robot_live.py --host 0.0.0.0 --port 5005 --config shanks --fps 50
 
 # Replay a recorded IMU handoff clip through ch_robot retargeting with visualization
 python demos/demo_replay_ch_robot_retarget.py ../data/demo_1.npz
@@ -132,6 +136,17 @@ python demos/demo_udp_quaternion_receiver.py --host 0.0.0.0 --port 5005
 # Measure latency to one node (IP from the ESP32 Serial Monitor)
 python demos/demo_udp_latency_ping.py 192.168.1.164 --port 5006
 ```
+
+For direct live MuJoCo visualization, the window opens immediately with
+`ch_robot` standing still. Sensor reception and neutral calibration then run
+in the background. The robot does not move until all required segments are
+streaming and calibration finishes. On macOS, `python` automatically relaunches
+the active environment's `mjpython`; invoking `mjpython` directly also works.
+
+The periodic `frames=N stale=M` status means `N` valid retargeted frames were
+applied and `M` update ticks were skipped because one or more packets exceeded
+`--max-age-ms`. Occasional stale frames are expected with wireless sensors;
+persistent growth indicates packet loss, a low sensor rate, or network jitter.
 
 **Partial IMU configs:**
 
