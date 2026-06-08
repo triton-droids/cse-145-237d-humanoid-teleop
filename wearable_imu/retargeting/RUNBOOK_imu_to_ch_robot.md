@@ -1,17 +1,27 @@
 # IMU / Camera to ch_robot Retargeting Runbook
 
-This runbook explains how to run retargeting, MuJoCo visualization, and 50 Hz
-ZMQ mock-live replay from recorded IMU or camera datasets. The commands assume
-you are on macOS, using the `hsretargeting` conda environment, with the repo at:
-
-```bash
-/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop
-```
+This runbook explains how to run retargeting, MuJoCo visualization, direct
+ESP32/BNO085 live visualization, and 50 Hz ZMQ replay. Commands are relative to
+the repository and use the checked-in `humanoid-sim` conda environment.
 
 ## 1. Check Out the Correct Branch
 
+Clone the repository if needed:
+
 ```bash
-cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop"
+git clone https://github.com/triton-droids/cse-145-237d-humanoid-teleop.git
+cd cse-145-237d-humanoid-teleop
+```
+
+For an existing clone, enter its root using your own path:
+
+```bash
+cd /path/to/cse-145-237d-humanoid-teleop
+```
+
+Then select the retargeting branch:
+
+```bash
 git fetch origin
 git switch imu-retarget
 git pull --ff-only origin imu-retarget
@@ -29,43 +39,53 @@ Expected output:
 ## imu-retarget...origin/imu-retarget
 ```
 
-## 2. Activate the Conda Environment
-
-If conda shell integration is already enabled:
-
-```bash
-conda activate hsretargeting
-```
-
-If your shell cannot find `conda activate`:
-
-```bash
-source /Users/yanglin/.holosoma_deps/miniconda3/etc/profile.d/conda.sh
-conda activate hsretargeting
-```
+## 2. Create the Conda Environment
 
 Enter the wearable IMU workspace:
 
 ```bash
-cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
+cd wearable_imu
 ```
 
-Quick dependency check:
+Create the complete Python 3.11 environment from the checked-in specification:
 
 ```bash
-python -c "import numpy, scipy, mujoco, zmq, matplotlib; print('deps ok')"
+conda env create -f env/environment.yml
 ```
 
-If a package is missing, try:
+This installs:
+
+- `numpy` and `scipy` for numerical processing and rotations
+- `matplotlib` for human-skeleton visualization
+- `mujoco` for the `ch_robot` simulator and macOS `mjpython` launcher
+- `pyzmq` for mock-live publisher/subscriber demos
+- `pytest` for verification
+
+Activate and verify it:
 
 ```bash
-python -m pip install numpy scipy matplotlib mujoco pyzmq pytest
+conda activate humanoid-sim
+python -c "import numpy, scipy, matplotlib, mujoco, zmq; print('dependencies OK')"
+python -m pytest -q
 ```
 
-Or update from the environment file:
+If the environment already exists, update it:
 
 ```bash
-conda env update -f env/environment.yml
+conda env update -n humanoid-sim -f env/environment.yml --prune
+```
+
+If `conda activate` is unavailable, initialize conda for your shell and restart
+the terminal:
+
+```bash
+conda init
+```
+
+You can also run commands without activation:
+
+```bash
+conda run --no-capture-output -n humanoid-sim python -m pytest -q
 ```
 
 ## 3. Available Input Data
@@ -335,16 +355,16 @@ frame into ch_robot `qpos`/`qvel` and updates MuJoCo online.
 Terminal 1: start the MuJoCo ZMQ subscriber.
 
 ```bash
-cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
-conda activate hsretargeting
+cd /path/to/cse-145-237d-humanoid-teleop/wearable_imu
+conda activate humanoid-sim
 python demos/demo_mujoco_ch_robot_zmq.py --endpoint tcp://127.0.0.1:5556 --base-motion root_xy_forward
 ```
 
 Terminal 2: start the 50 Hz publisher.
 
 ```bash
-cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
-conda activate hsretargeting
+cd /path/to/cse-145-237d-humanoid-teleop/wearable_imu
+conda activate humanoid-sim
 python demos/demo_zmq_human_joint_publisher.py ../data/smplh_capture_3.jsonl --endpoint tcp://127.0.0.1:5556 --fps 50
 ```
 
@@ -665,7 +685,7 @@ python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-s
 Run from the `wearable_imu/` directory:
 
 ```bash
-cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop/wearable_imu"
+cd /path/to/cse-145-237d-humanoid-teleop/wearable_imu
 python -m pytest tests/test_ch_robot_retarget.py -q
 ```
 
@@ -677,12 +697,11 @@ Do not run `wearable_imu/tests/...` directly from the repo root unless you set
 At the start of a session:
 
 ```bash
-cd "/Users/yanglin/Documents/UCSD/Clubs/Triton Droids/cse-145-237d-humanoid-teleop"
+cd /path/to/cse-145-237d-humanoid-teleop
 git switch imu-retarget
 git pull --ff-only origin imu-retarget
-source /Users/yanglin/.holosoma_deps/miniconda3/etc/profile.d/conda.sh
-conda activate hsretargeting
 cd wearable_imu
+conda activate humanoid-sim
 python demos/demo_mujoco_ch_robot_replay.py ../data/smplh_capture_3.jsonl --no-show --base-motion root_xy_forward
 ```
 

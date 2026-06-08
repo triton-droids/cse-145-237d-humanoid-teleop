@@ -18,5 +18,8 @@ matplotlib
 # MuJoCo synthetic-IMU viewer (demo_mujoco_lower_body_viewer.py)
 mujoco
 
+# ZeroMQ mock-live publisher/subscriber demos
+pyzmq
+
 # Test suite
 pytest

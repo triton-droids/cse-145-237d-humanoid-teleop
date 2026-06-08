@@ -78,9 +78,9 @@ want conda.
 > tested, known-good version.
 
 The runtime dependencies are listed in [`requirements.txt`](requirements.txt):
-`numpy`, `scipy`, `matplotlib`, `mujoco`, and `pytest`. (`tkinter`, used by the
-GUI demos, ships with Python and is not a pip package — see the per-platform
-note below.)
+`numpy`, `scipy`, `matplotlib`, `mujoco`, `pyzmq`, and `pytest`. (`tkinter`,
+used by the GUI demos, ships with Python and is not a pip package — see the
+per-platform note below.)
 
 ### Option A: Miniconda / Conda (recommended)
 
@@ -96,23 +96,44 @@ also provides `tkinter` automatically.
 | **macOS (Intel)** | `curl -fsSL -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh && bash ~/miniconda.sh -b -p ~/miniconda3` |
 | **Windows** | Download and run the [Miniconda installer](https://docs.conda.io/en/latest/miniconda.html), or `winget install Anaconda.Miniconda3` |
 
-**2. Create the environment** (use the `conda-forge` channel to avoid the
-default-channel Terms-of-Service prompt):
+**2. Enter the wearable IMU directory.** Replace the placeholder with your
+clone location:
+
+```bash
+cd /path/to/cse-145-237d-humanoid-teleop/wearable_imu
+```
+
+**3. Create the environment.** The checked-in file installs Python 3.11 and all
+required Python packages:
+
+```bash
+conda env create -f env/environment.yml
+```
+
+If `humanoid-sim` already exists, update it instead:
+
+```bash
+conda env update -n humanoid-sim -f env/environment.yml --prune
+```
+
+The equivalent manual setup is:
 
 ```bash
 conda create -y -n humanoid-sim -c conda-forge --override-channels python=3.11 pip
-```
-
-**3. Install the dependencies:**
-
-```bash
 conda run -n humanoid-sim pip install -r requirements.txt
 ```
 
-**4. Run things.** Either activate the environment:
+**4. Activate and verify the environment:**
 
 ```bash
 conda activate humanoid-sim
+python -c "import numpy, scipy, matplotlib, mujoco, zmq; print('dependencies OK')"
+python -m pytest -q
+```
+
+**5. Run things.** With the environment active:
+
+```bash
 python demos/demo_launcher.py
 ```
 

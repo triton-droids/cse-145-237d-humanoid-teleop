@@ -9,9 +9,9 @@ file is the short reference.
 
 ## Dependencies
 
-Runtime dependencies are `numpy`, `scipy`, `matplotlib`, `mujoco`, and `pytest`
-(plus `tkinter`, which ships with Python for the GUI demos). They are declared in
-two equivalent places:
+Runtime dependencies are `numpy`, `scipy`, `matplotlib`, `mujoco`, `pyzmq`,
+and `pytest` (plus `tkinter`, which ships with Python for the GUI demos). They
+are declared in two equivalent places:
 
 - [`environment.yml`](environment.yml) — for `conda env create`
 - [`../requirements.txt`](../requirements.txt) — for `pip install`
@@ -23,7 +23,16 @@ Keep the two in sync when adding or removing a dependency.
 Create the `humanoid-sim` environment from the spec:
 
 ```bash
+cd /path/to/cse-145-237d-humanoid-teleop/wearable_imu
 conda env create -f env/environment.yml
+conda activate humanoid-sim
+```
+
+Replace `/path/to/cse-145-237d-humanoid-teleop` with the directory where you
+cloned the repository. If the environment already exists, update it with:
+
+```bash
+conda env update -n humanoid-sim -f env/environment.yml --prune
 ```
 
 Or build it manually with the `conda-forge` channel (avoids the default-channel

@@ -42,6 +42,33 @@ Wearable IMUs / RGB-D camera
 
 ## Quick Start
 
+Clone the repository and create the checked-in Python 3.11 conda environment:
+
+```bash
+git clone https://github.com/triton-droids/cse-145-237d-humanoid-teleop.git
+cd cse-145-237d-humanoid-teleop
+git switch imu-retarget
+cd wearable_imu
+conda env create -f env/environment.yml
+conda activate humanoid-sim
+python -c "import numpy, scipy, matplotlib, mujoco, zmq; print('dependencies OK')"
+```
+
+Run the five-IMU live `ch_robot` MuJoCo workflow:
+
+```bash
+python demos/demo_mujoco_ch_robot_live.py \
+  --host 0.0.0.0 \
+  --port 5005 \
+  --config shanks \
+  --fps 50
+```
+
+The MuJoCo window opens with the robot standing still. It starts moving only
+after the required devices are streaming and neutral calibration completes.
+On macOS, the script automatically relaunches with the active environment's
+`mjpython`.
+
 Each subsystem has its own setup notes — start there if you're new to a component:
 
 - Wearable IMU pipeline: [`wearable_imu/README.md`](wearable_imu/README.md)

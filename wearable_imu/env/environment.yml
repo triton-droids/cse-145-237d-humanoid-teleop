@@ -10,4 +10,5 @@ dependencies:
       - scipy
       - matplotlib
       - mujoco
+      - pyzmq
       - pytest
