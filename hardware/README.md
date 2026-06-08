@@ -88,18 +88,22 @@ stored in flash. Copy `esp32_bno085_udp/secrets.example.h` to `secrets.h` to
 set Wi-Fi defaults locally without editing the sketch. `secrets.h` is ignored
 by Git.
 
-Segment IDs:
+Segment IDs (each board's onboard RGB LED is colored from its `segment_id`, so
+you can tell at a glance which placement a board is configured for):
 
-```text
-0 pelvis
-1 left_thigh
-2 left_shank
-3 left_foot
-4 right_thigh
-5 right_shank
-6 right_foot
-255 unknown
-```
+| ID | Segment | LED color | RGB |
+|---|---|---|---|
+| 0 | pelvis | white | `255,255,255` |
+| 1 | left_thigh | green | `0,220,80` |
+| 2 | left_shank | yellow | `255,230,0` |
+| 3 | left_foot | blue | `0,60,255` |
+| 4 | right_thigh | orange | `255,140,0` |
+| 5 | right_shank | purple | `190,70,255` |
+| 6 | right_foot | red | `255,40,40` |
+| 255 | unknown | gray | `80,80,80` |
+
+The color updates live when you set `segment <n>` over serial, so it doubles as
+a quick confirmation that the segment id took.
 
 The firmware sends 40-byte little-endian UDP packets with `IMUQ` magic and
 `wxyz` quaternion order. The matching parser lives in `sensor/packet.py`.
