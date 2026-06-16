@@ -1,0 +1,35 @@
+{
+  "robot_name": "ch_robot",
+  "retargeted_motion": {
+    "required_keys": ["qpos", "fps", "human_joints", "cost"],
+    "qpos_shape": ["frames", 17],
+    "qpos_layout": "7 floating-base values + 10 joint positions"
+  },
+  "converted_motion": {
+    "required_keys": [
+      "joint_pos",
+      "joint_vel",
+      "body_pos_w",
+      "body_quat_w",
+      "body_lin_vel_w",
+      "body_ang_vel_w",
+      "joint_names",
+      "body_names",
+      "fps"
+    ],
+    "joint_pos_shape": ["frames", 17],
+    "joint_vel_shape": ["frames", 16]
+  },
+  "joint_names": [
+    "left_hip1_joint",
+    "left_hip2_joint",
+    "left_thigh_joint",
+    "left_knee_joint",
+    "left_ankle_joint",
+    "right_hip1_joint",
+    "right_hip2_joint",
+    "right_thigh_joint",
+    "right_knee_joint",
+    "right_ankle_joint"
+  ]
+}

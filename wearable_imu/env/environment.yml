@@ -1,0 +1,13 @@
+name: humanoid-sim
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - numpy
+      - scipy
+      - matplotlib
+      - mujoco
+      - pytest

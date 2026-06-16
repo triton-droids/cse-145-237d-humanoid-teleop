@@ -1,0 +1,54 @@
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+*.dmg
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+.conda/
+.pip-cache/
+
+# Editor/project-local files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+.python.env
+secrets.h
+*.pem
+*.key
+
+# Generated simulation/training artifacts
+logs/
+outputs/
+test5/
+wandb/
+runs/
+events.out.tfevents.*
+*.pth
+*.pt
+*.pkl
+*.bag
+*.mcap
+*.h5
+*.hdf5
+
+# Local scraping/tooling cache
+.firecrawl/

@@ -1,0 +1,246 @@
+From 1c8c373d3ae8c40d64a8d774c53cd39584af516c Mon Sep 17 00:00:00 2001
+From: YangLin14 <fongyu93@gmail.com>
+Date: Tue, 19 May 2026 16:55:23 -0700
+Subject: [PATCH] Add ch_robot support to retargeting converter
+
+---
+ holosoma-main/scripts/setup_retargeting.sh    | 28 +++++------
+ .../scripts/source_retargeting_setup.sh       |  4 +-
+ .../config_types/data_conversion.py           | 17 ++++++-
+ .../data_conversion/convert_data_format_mj.py | 50 +++++++++++++------
+ 4 files changed, 66 insertions(+), 33 deletions(-)
+
+diff --git a/holosoma-main/scripts/setup_retargeting.sh b/holosoma-main/scripts/setup_retargeting.sh
+index 7737a62..9de0458 100755
+--- a/holosoma-main/scripts/setup_retargeting.sh
++++ b/holosoma-main/scripts/setup_retargeting.sh
+@@ -17,17 +17,17 @@ CONDA_ENV_NAME=${CONDA_ENV_NAME:-hsretargeting}
+ echo "conda environment name is set to: $CONDA_ENV_NAME"
+ 
+ # Create overall workspace
+-source ${SCRIPT_DIR}/source_common.sh
+-ENV_ROOT=$CONDA_ROOT/envs/$CONDA_ENV_NAME
+-SENTINEL_FILE=${WORKSPACE_DIR}/.env_setup_retargeting_$CONDA_ENV_NAME
++source "${SCRIPT_DIR}/source_common.sh"
++ENV_ROOT="${CONDA_ROOT}/envs/${CONDA_ENV_NAME}"
++SENTINEL_FILE="${WORKSPACE_DIR}/.env_setup_retargeting_${CONDA_ENV_NAME}"
+ echo "SENTINEL_FILE: $SENTINEL_FILE"
+ 
+-mkdir -p $WORKSPACE_DIR
++mkdir -p "$WORKSPACE_DIR"
+ 
+ if [[ ! -f $SENTINEL_FILE ]]; then
+   # Install miniconda
+   if [[ ! -d $CONDA_ROOT ]]; then
+-    mkdir -p $CONDA_ROOT
++    mkdir -p "$CONDA_ROOT"
+ 
+     # Detect OS and arch
+     OS_NAME="$(uname -s)"
+@@ -50,22 +50,22 @@ if [[ ! -f $SENTINEL_FILE ]]; then
+     fi
+ 
+     curl "https://repo.anaconda.com/miniconda/${MINICONDA_INSTALLER}" -o "$CONDA_ROOT/miniconda.sh"
+-    bash $CONDA_ROOT/miniconda.sh -b -u -p $CONDA_ROOT
+-    rm $CONDA_ROOT/miniconda.sh
++    bash "$CONDA_ROOT/miniconda.sh" -b -u -p "$CONDA_ROOT"
++    rm "$CONDA_ROOT/miniconda.sh"
+   fi
+ 
+   # Create the conda environment
+   if [[ ! -d $ENV_ROOT ]]; then
+-    $CONDA_ROOT/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+-    $CONDA_ROOT/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+-    $CONDA_ROOT/bin/conda install -y mamba -c conda-forge -n base
+-    MAMBA_ROOT_PREFIX=$CONDA_ROOT $CONDA_ROOT/bin/mamba create -y -n $CONDA_ENV_NAME python=3.11 -c conda-forge --override-channels
++    "$CONDA_ROOT/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
++    "$CONDA_ROOT/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
++    "$CONDA_ROOT/bin/conda" install -y mamba -c conda-forge -n base
++    MAMBA_ROOT_PREFIX="$CONDA_ROOT" "$CONDA_ROOT/bin/mamba" create -y -n "$CONDA_ENV_NAME" python=3.11 -c conda-forge --override-channels
+   fi
+ 
+-  source $CONDA_ROOT/bin/activate $CONDA_ENV_NAME
++  source "$CONDA_ROOT/bin/activate" "$CONDA_ENV_NAME"
+ 
+   # Install holosoma_retargeting
+   pip install -U pip
+-  pip install -e $ROOT_DIR/src/holosoma_retargeting
+-  touch $SENTINEL_FILE
++  pip install -e "$ROOT_DIR/src/holosoma_retargeting"
++  touch "$SENTINEL_FILE"
+ fi
+diff --git a/holosoma-main/scripts/source_retargeting_setup.sh b/holosoma-main/scripts/source_retargeting_setup.sh
+index ff9a0c5..b517ea0 100755
+--- a/holosoma-main/scripts/source_retargeting_setup.sh
++++ b/holosoma-main/scripts/source_retargeting_setup.sh
+@@ -8,5 +8,5 @@ fi
+ CONDA_ENV_NAME=${CONDA_ENV_NAME:-hsretargeting}
+ echo "conda environment name is set to: $CONDA_ENV_NAME"
+ 
+-source ${SCRIPT_DIR}/source_common.sh
+-source ${CONDA_ROOT}/bin/activate $CONDA_ENV_NAME
++source "${SCRIPT_DIR}/source_common.sh"
++source "${CONDA_ROOT}/bin/activate" "$CONDA_ENV_NAME"
+diff --git a/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/config_types/data_conversion.py b/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/config_types/data_conversion.py
+index 1ddb95c..3101d5f 100644
+--- a/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/config_types/data_conversion.py
++++ b/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/config_types/data_conversion.py
+@@ -38,7 +38,19 @@ _ROBOT_JOINT_NAMES_DEFAULT = {
+         "right_wrist_roll_joint",
+         "right_wrist_pitch_joint",
+         "right_wrist_yaw_joint",
+-    ]
++    ],
++    "ch_robot": [
++        "left_hip1_joint",
++        "left_hip2_joint",
++        "left_thigh_joint",
++        "left_knee_joint",
++        "left_ankle_joint",
++        "right_hip1_joint",
++        "right_hip2_joint",
++        "right_thigh_joint",
++        "right_knee_joint",
++        "right_ankle_joint",
++    ],
+ }
+ 
+ 
+@@ -80,6 +92,9 @@ class DataConversionConfig:
+     once: bool = False
+     """Run the motion once and exit."""
+ 
++    headless: bool = False
++    """Run conversion without launching the MuJoCo viewer."""
++
+     use_omniretarget_data: bool = False
+     """Use OmniRetarget data format."""
+ 
+diff --git a/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/data_conversion/convert_data_format_mj.py b/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/data_conversion/convert_data_format_mj.py
+index ab260bd..7c38493 100644
+--- a/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/data_conversion/convert_data_format_mj.py
++++ b/holosoma-main/src/holosoma_retargeting/holosoma_retargeting/data_conversion/convert_data_format_mj.py
+@@ -118,6 +118,7 @@ class MotionLoader:
+         line_range: tuple[int, int] | None,
+         has_dynamic_object: bool,
+         use_omniretarget_data: bool,
++        robot_dof: int,
+     ):
+         self.motion_file = motion_file
+         self.input_fps = input_fps
+@@ -129,6 +130,7 @@ class MotionLoader:
+         self.line_range = line_range
+         self.has_dynamic_object = has_dynamic_object
+         self.use_omniretarget_data = use_omniretarget_data
++        self.robot_dof = robot_dof
+         self._load_motion()
+         self._interpolate_motion()
+         self._compute_velocities()
+@@ -137,7 +139,9 @@ class MotionLoader:
+         """Loads the motion from the csv file."""
+         if self.motion_file.endswith(".npz"):
+             data = np.load(self.motion_file)
+-            self.input_fps = round(1 / data.get("fps", 1 / self.input_fps))
++            fps_value = float(np.asarray(data.get("fps", self.input_fps)).reshape(-1)[0])
++            self.input_fps = round(1 / fps_value) if 0 < fps_value < 1 else round(fps_value)
++            self.input_dt = 1.0 / self.input_fps
+             motion = torch.from_numpy(data["qpos"]).to(torch.float32)
+         else:
+             raise ValueError("Unsupported motion file format. Use .csv or .npz.")
+@@ -162,15 +166,22 @@ class MotionLoader:
+             self.motion_base_poss_input = motion[:, :3]
+             self.motion_base_rots_input = motion[:, 3:7]
+ 
+-        self.motion_dof_poss_input = motion[:, 7:36]
++        dof_start = 7
++        dof_end = dof_start + self.robot_dof
++        self.motion_dof_poss_input = motion[:, dof_start:dof_end]
++        if self.motion_dof_poss_input.shape[1] != self.robot_dof:
++            raise ValueError(
++                f"Expected {self.robot_dof} robot DOF in {self.motion_file}, "
++                f"got {self.motion_dof_poss_input.shape[1]} from qpos shape {tuple(motion.shape)}"
++            )
+ 
+         if self.has_dynamic_object:
+             if self.use_omniretarget_data:
+                 self.motion_object_poss_input = motion[:, -3:]
+                 self.motion_object_rots_input = motion[:, -7:-3]
+             else:
+-                self.motion_object_poss_input = motion[:, -7:-4]
+-                self.motion_object_rots_input = motion[:, -4:]
++                self.motion_object_poss_input = motion[:, dof_end : dof_end + 3]
++                self.motion_object_rots_input = motion[:, dof_end + 3 : dof_end + 7]
+ 
+         self.input_frames = motion.shape[0]
+         self.duration = (self.input_frames - 1) * self.input_dt
+@@ -356,6 +367,7 @@ def world_body_velocities(model, data):
+ def run_simulator(args_cli: DataConversionConfig):
+     """Runs the simulation loop."""
+     joint_names = args_cli.JOINT_NAMES
++    robot_dof = len(joint_names)
+     # Load motion
+     device = torch.device("cpu")
+     has_dynamic_object = args_cli.has_dynamic_object
+@@ -369,6 +381,7 @@ def run_simulator(args_cli: DataConversionConfig):
+         line_range=line_range,
+         has_dynamic_object=has_dynamic_object,
+         use_omniretarget_data=use_omniretarget_data,
++        robot_dof=robot_dof,
+     )
+ 
+     object_name = args_cli.object_name
+@@ -426,15 +439,17 @@ def run_simulator(args_cli: DataConversionConfig):
+     print(dof_index_list)
+ 
+     # Prepare mujoco viewer
+-    viewer = mjv.launch_passive(robot, robot_data, show_left_ui=False, show_right_ui=False)
+-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = 0
+-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 0
+-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 0
+-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_COM] = 0
+-
+-    viewer.cam.distance = 2.0
+-    viewer.cam.elevation = -20.0
+-    viewer.cam.azimuth = 45.0
++    viewer = None
++    if not args_cli.headless:
++        viewer = mjv.launch_passive(robot, robot_data, show_left_ui=False, show_right_ui=False)
++        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = 0
++        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 0
++        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 0
++        viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_COM] = 0
++
++        viewer.cam.distance = 2.0
++        viewer.cam.elevation = -20.0
++        viewer.cam.azimuth = 45.0
+ 
+     log: dict[str, Any]
+     if has_dynamic_object:
+@@ -531,10 +546,12 @@ def run_simulator(args_cli: DataConversionConfig):
+             )
+ 
+         mujoco.mj_forward(robot, robot_data)
+-        viewer.sync()
++        if viewer is not None:
++            viewer.sync()
+ 
+         end_time = time.perf_counter()
+-        time.sleep(max(0, motion.output_dt - (end_time - start_time)))
++        if viewer is not None:
++            time.sleep(max(0, motion.output_dt - (end_time - start_time)))
+ 
+         if not file_saved:
+             lin_vel_w, ang_vel_w = world_body_velocities(robot, robot_data)
+@@ -597,7 +614,8 @@ def run_simulator(args_cli: DataConversionConfig):
+ 
+         if args_cli.once and file_saved:
+             print("[INFO]: Motion replay completed, exiting...")
+-            viewer.close()
++            if viewer is not None:
++                viewer.close()
+             break
+ 
+ 
+-- 
+2.39.5 (Apple Git-154)
+
